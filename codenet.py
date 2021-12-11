@@ -125,51 +125,6 @@ def clean_problem_list(problem_list_df: pd.DataFrame = None):
     return problem_list_df
 
 
-def handle_process(command, input=None, timeout=None):
-    shell = False
-    if not isinstance(command, list):
-        shell = True
-
-    process = subprocess.Popen(
-        command,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=shell,
-        encoding="utf-8",
-        errors="ignore",
-    )
-
-    try:
-        output, error = process.communicate(input, timeout)
-        return output, error, process.returncode
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.communicate()
-        raise TimeoutError
-
-
-def run_ctokenizer(file_path):
-    grep_command = "grep -P -v '^[ \\t]*#[ ]*include[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
-
-    with tempfile.NamedTemporaryFile("w+t", suffix=".c") as writer:
-        output, error, returncode = handle_process(f"{grep_command} {file_path} | gcc -E -P -xc - -o {writer.name}")
-        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode}"
-        output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
-        assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
-
-    return pd.read_csv(io.StringIO(output), sep=",")
-
-
-def run_tokenizer(problem_id, language, submission_id, filename_ext):
-    if language == "C":
-        return run_ctokenizer(
-            id2submission(problem_id, language, submission_id, filename_ext)
-        )
-
-    assert False, "Error"
-
-
 def preprocess_problem_for_language(
     problem_df: pd.DataFrame, problem_id: str, language: str = "C", extension: str = "c"
 ):
@@ -289,6 +244,53 @@ def generate_pairs(problem_list_df: pd.DataFrame = None):
     return df
 
 
+def handle_process(command, input=None, timeout=None):
+    shell = False
+    if not isinstance(command, list):
+        shell = True
+
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=shell,
+        encoding="utf-8",
+        errors="ignore",
+    )
+
+    try:
+        output, error = process.communicate(input, timeout)
+        return output, error, process.returncode
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+        raise TimeoutError
+
+
+def run_ctokenizer(file_path):
+    grep_command = "grep -P -v '^[ \\t]*#[ ]*include[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
+
+    with tempfile.NamedTemporaryFile("w+t", suffix=".c") as writer:
+        output, error, returncode = handle_process(
+            f"{grep_command} {file_path} | gcc -E -P -xc - -o {writer.name}"
+        )
+        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode}"
+        output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
+        assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
+
+    return pd.read_csv(io.StringIO(output), sep=",")
+
+
+def run_tokenizer(problem_id, language, submission_id, filename_ext):
+    if language == "C":
+        return run_ctokenizer(
+            id2submission(problem_id, language, submission_id, filename_ext)
+        )
+
+    assert False, "Error"
+
+
 def clean_genereated_pairs_task(
     original_id,
     changed_id,
@@ -301,12 +303,8 @@ def clean_genereated_pairs_task(
     language,
     filename_ext,
 ):
-    original_tokens_df = run_tokenizer(
-        problem_id, language, original_id, filename_ext
-    )
-    changed_tokens_df = run_tokenizer(
-        problem_id, language, changed_id, filename_ext
-    )
+    original_tokens_df = run_tokenizer(problem_id, language, original_id, filename_ext)
+    changed_tokens_df = run_tokenizer(problem_id, language, changed_id, filename_ext)
 
     a = original_tokens_df["text"].values
     b = changed_tokens_df["text"].values
@@ -329,10 +327,9 @@ def clean_genereated_pairs_task(
     return df
 
 
-def clean_genereated_pairs2(generated_pairs_df: pd.DataFrame = None):
+def clean_genereated_pairs(generated_pairs_df: pd.DataFrame = None):
     if generated_pairs_df is None:
         generated_pairs_df = pd.read_csv(generated_pairs_path)
-    generated_pairs_df = generated_pairs_df[generated_pairs_df['problem_id'] == 'p02401']
     submissions_diff_dfs = []
 
     with tqdm(total=len(generated_pairs_df)) as pbar:
@@ -343,12 +340,25 @@ def clean_genereated_pairs2(generated_pairs_df: pd.DataFrame = None):
             }
 
             for future in concurrent.futures.as_completed(future_to_problem_id):
-                original_id,changed_id,original_line,diff_op,changed_line,original_status,original_language,problem_id,language,filename_ext = future_to_problem_id[future]
+                (
+                    original_id,
+                    changed_id,
+                    original_line,
+                    diff_op,
+                    changed_line,
+                    original_status,
+                    original_language,
+                    problem_id,
+                    language,
+                    filename_ext,
+                ) = future_to_problem_id[future]
                 try:
                     problem_pairs_df = future.result()
                     submissions_diff_dfs.append(problem_pairs_df)
                 except Exception as exc:
-                    print(f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}")
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
                     traceback.print_exc()
                 else:
                     pbar.set_description(f"Processing {problem_id} {original_id}")
@@ -385,5 +395,4 @@ if __name__ == "__main__":
     if args.genpairs:
         generate_pairs().to_csv(generated_pairs_path, index=False)
     if args.cleanpairs:
-        clean_genereated_pairs2()
-        # clean_genereated_pairs().to_csv(cleaned_generated_pairs_path, index=False)
+        clean_genereated_pairs().to_csv(cleaned_generated_pairs_path, index=False)
