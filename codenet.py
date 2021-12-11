@@ -28,7 +28,7 @@ from difflib import Differ, SequenceMatcher
 from collections import Counter
 from argparse import ArgumentParser
 
-from mydifflib import group_diff_chunks, pdiff, single_change, single_line_changed
+from mydifflib import group_diff_chunks, pdiff, single_change
 
 tqdm.pandas()
 
@@ -241,7 +241,7 @@ def generate_pairs(problem_list_df: pd.DataFrame = None):
 
     df = pd.concat(dfs, ignore_index=True)
 
-    return df
+    return df.sort_values('original_id')
 
 
 def handle_process(command, input=None, timeout=None):
