@@ -10,6 +10,7 @@ import tarfile
 import tempfile
 import itertools
 import functools
+import traceback
 import subprocess
 import concurrent.futures
 
@@ -44,7 +45,7 @@ derived_path = root_path + "derived/"
 descriptions_path = root_path + "problem_descriptions/"
 
 problem_list_clean_path = input_path + "problem_list_clean.csv"
-generated_pairs_path = input_path + "single_instruction.csv"
+generated_pairs_path = input_path + "generated_pairs.csv"
 cleaned_generated_pairs_path = input_path + "cleaned_generated_pairs.csv"
 
 supported_languages = ["C"]
@@ -281,6 +282,7 @@ def generate_pairs():
                     dfs.append(problem_pairs_df)
                 except Exception as exc:
                     print(f"{problem_id} generated an exception: {exc}")
+                    traceback.print_exc()
                 else:
                     pbar.set_description(f"Processing {problem_id}")
                     pbar.update(1)
@@ -361,6 +363,7 @@ def clean_genereated_pairs():
                     submissions_diff_dfs.append(problem_pairs_df)
                 except Exception as exc:
                     print(f"{problem_id} generated an exception: {exc}")
+                    traceback.print_exc()
                 else:
                     pbar.set_description(f"Processing {problem_id}")
                     pbar.update(1)
