@@ -121,8 +121,6 @@ def clean_problem_list():
     problem_list_df = problem_list_df[input_mask]
     problem_ids = problem_list_df.index.unique()
 
-    problem_list_df.to_csv(problem_list_clean_path)
-
     return problem_list_df
 
 
@@ -288,7 +286,6 @@ def generate_pairs():
                     pbar.update(1)
 
     df = pd.concat(dfs, ignore_index=True)
-    df.to_csv(generated_pairs_path, index=False)
 
     return df
 
@@ -369,7 +366,8 @@ def clean_genereated_pairs():
                     pbar.update(1)
 
     df = pd.concat(submissions_diff_dfs, ignore_index=True)
-    df.to_csv(cleaned_generated_pairs_path, index=False)
+
+    return df
 
 
 if __name__ == "__main__":
@@ -394,8 +392,8 @@ if __name__ == "__main__":
     if args.download:
         download_data()
     if args.cleanlist:
-        clean_problem_list()
+        clean_problem_list().to_csv(problem_list_clean_path)
     if args.genpairs:
-        generate_pairs()
+        generate_pairs().to_csv(generated_pairs_path, index=False)
     if args.cleanpairs:
-        clean_genereated_pairs()
+        clean_genereated_pairs().to_csv(cleaned_generated_pairs_path, index=False)
