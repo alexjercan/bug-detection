@@ -311,7 +311,7 @@ def clean_genereated_pairs_task(
     s = SequenceMatcher(None, a, b)
     opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
     if len(opcodes) != 1:
-        pd.DataFrame()
+        return pd.DataFrame()
 
     tag, i1, i2, j1, j2 = opcodes[0]
     df = original_tokens_df[i1:i2].merge(
