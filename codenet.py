@@ -12,6 +12,7 @@ import itertools
 import functools
 import traceback
 import subprocess
+import multiprocessing
 import concurrent.futures
 
 import pandas as pd
@@ -100,12 +101,12 @@ def download_data():
         tf.extractall(path=data_path)
 
 
-def clean_problem_list():
+def clean_problem_list(problem_list_df: pd.DataFrame = None):
     file_path = metadata_path + "problem_list.csv"
     print(f"Cleaning {file_path}")
 
-    problem_list_df = pd.read_csv(file_path)
-    problem_list_df.set_index("id", inplace=True)
+    if problem_list_df is None:
+        problem_list_df = pd.read_csv(file_path, index_col="id")
 
     problem_list_df["time_limit"].fillna(
         problem_list_df["time_limit"].median(), inplace=True
@@ -124,7 +125,7 @@ def clean_problem_list():
     return problem_list_df
 
 
-def handle_process(command, input=None, timeout=1):
+def handle_process(command, input=None, timeout=None):
     shell = False
     if not isinstance(command, list):
         shell = True
@@ -150,14 +151,12 @@ def handle_process(command, input=None, timeout=1):
 
 def run_ctokenizer(file_path):
     grep_command = "grep -P -v '^[ \\t]*#[ ]*include[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
-    tmp_c_file = "/tmp/tmp.c"
 
-    output, error, returncode = handle_process(
-        f"{grep_command} {file_path} | gcc -E -P -xc - -o {tmp_c_file}"
-    )
-    assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode}"
-    output, error, returncode = handle_process(f"{tokenizer_path} {tmp_c_file}")
-    assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
+    with tempfile.NamedTemporaryFile("w+t", suffix=".c") as writer:
+        output, error, returncode = handle_process(f"{grep_command} {file_path} | gcc -E -P -xc - -o {writer.name}")
+        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode}"
+        output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
+        assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
 
     return pd.read_csv(io.StringIO(output), sep=",")
 
@@ -259,12 +258,12 @@ def generate_pairs_task(problem_id: str):
     return pd.DataFrame() if not dfs else pd.concat(dfs, ignore_index=True)
 
 
-def generate_pairs():
+def generate_pairs(problem_list_df: pd.DataFrame = None):
+    if problem_list_df is None:
+        problem_list_df = pd.read_csv(problem_list_clean_path, index_col="id")
     dfs = []
 
-    problem_list_df = pd.read_csv(problem_list_clean_path, index_col="id")
     problem_ids = problem_list_df.index.unique()
-
     with tqdm(total=len(problem_ids)) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
             future_to_problem_id = {
@@ -302,23 +301,12 @@ def clean_genereated_pairs_task(
     language,
     filename_ext,
 ):
-    errored_tokens = []
-
-    try:
-        original_tokens_df = run_tokenizer(
-            problem_id, language, original_id, filename_ext
-        )
-        changed_tokens_df = run_tokenizer(
-            problem_id, language, changed_id, filename_ext
-        )
-    except:
-        errored_tokens.append(
-            (
-                id2submission(problem_id, language, original_id, filename_ext),
-                id2submission(problem_id, language, changed_id, filename_ext),
-            )
-        )
-        return pd.DataFrame()
+    original_tokens_df = run_tokenizer(
+        problem_id, language, original_id, filename_ext
+    )
+    changed_tokens_df = run_tokenizer(
+        problem_id, language, changed_id, filename_ext
+    )
 
     a = original_tokens_df["text"].values
     b = changed_tokens_df["text"].values
@@ -341,28 +329,29 @@ def clean_genereated_pairs_task(
     return df
 
 
-def clean_genereated_pairs():
-    generated_pairs_df = pd.read_csv(generated_pairs_path)
+def clean_genereated_pairs2(generated_pairs_df: pd.DataFrame = None):
+    if generated_pairs_df is None:
+        generated_pairs_df = pd.read_csv(generated_pairs_path)
+    generated_pairs_df = generated_pairs_df[generated_pairs_df['problem_id'] == 'p02401']
     submissions_diff_dfs = []
 
     with tqdm(total=len(generated_pairs_df)) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
             future_to_problem_id = {
-                executor.submit(clean_genereated_pairs_task, *row): row[7]
+                executor.submit(clean_genereated_pairs_task, *row): row
                 for _, row in generated_pairs_df.iterrows()
             }
 
             for future in concurrent.futures.as_completed(future_to_problem_id):
-                problem_id = future_to_problem_id[future]
-
+                original_id,changed_id,original_line,diff_op,changed_line,original_status,original_language,problem_id,language,filename_ext = future_to_problem_id[future]
                 try:
                     problem_pairs_df = future.result()
                     submissions_diff_dfs.append(problem_pairs_df)
                 except Exception as exc:
-                    print(f"{problem_id} generated an exception: {exc}")
+                    print(f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}")
                     traceback.print_exc()
                 else:
-                    pbar.set_description(f"Processing {problem_id}")
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
                     pbar.update(1)
 
     df = pd.concat(submissions_diff_dfs, ignore_index=True)
@@ -396,4 +385,5 @@ if __name__ == "__main__":
     if args.genpairs:
         generate_pairs().to_csv(generated_pairs_path, index=False)
     if args.cleanpairs:
-        clean_genereated_pairs().to_csv(cleaned_generated_pairs_path, index=False)
+        clean_genereated_pairs2()
+        # clean_genereated_pairs().to_csv(cleaned_generated_pairs_path, index=False)
