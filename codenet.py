@@ -220,7 +220,7 @@ def generate_pairs(problem_list_df: pd.DataFrame = None):
 
     problem_ids = problem_list_df.index.unique()
     with tqdm(total=len(problem_ids)) as pbar:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
             future_to_problem_id = {
                 executor.submit(generate_pairs_task, problem_id): problem_id
                 for problem_id in problem_ids
@@ -241,7 +241,7 @@ def generate_pairs(problem_list_df: pd.DataFrame = None):
 
     df = pd.concat(dfs, ignore_index=True)
 
-    return df.sort_values('original_id')
+    return df.sort_values("original_id")
 
 
 def handle_process(command, input=None, timeout=None):
@@ -323,6 +323,8 @@ def clean_genereated_pairs_task(
     df["changed_id"] = changed_id
     df["language"] = language
     df["extension"] = filename_ext
+    df["original_language"] = original_language
+    df["original_status"] = original_status
 
     return df
 
@@ -333,7 +335,7 @@ def clean_genereated_pairs(generated_pairs_df: pd.DataFrame = None):
     submissions_diff_dfs = []
 
     with tqdm(total=len(generated_pairs_df)) as pbar:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
             future_to_problem_id = {
                 executor.submit(clean_genereated_pairs_task, *row): row
                 for _, row in generated_pairs_df.iterrows()
@@ -385,10 +387,15 @@ if __name__ == "__main__":
         help="clean the generated source code pairs",
         action="store_true",
     )
+    parser.add_argument("-P", help="number of processors to use", default=4, type=int)
 
     args = parser.parse_args()
 
-    assert "AI4CODE_HOME" in os.environ, "You need to compile the AST Tokenizer and then source the spt.profile script\n"
+    assert (
+        "AI4CODE_HOME" in os.environ
+    ), "You need to compile the AST Tokenizer and then source the spt.profile script\n"
+
+    P = args.P
 
     if args.download:
         download_data()
