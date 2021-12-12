@@ -388,6 +388,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    assert "AI4CODE_HOME" in os.environ, "You need to compile the AST Tokenizer and then source the spt.profile script\n"
+
     if args.download:
         download_data()
     if args.cleanlist:
