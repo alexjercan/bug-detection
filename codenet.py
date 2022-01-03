@@ -29,6 +29,7 @@ from collections import Counter
 from argparse import ArgumentParser
 
 from mydifflib import group_diff_chunks, pdiff, single_change
+from parser import mk_add_token_class
 
 tqdm.pandas()
 
@@ -48,6 +49,7 @@ descriptions_path = root_path + "problem_descriptions/"
 problem_list_clean_path = input_path + "problem_list_clean.csv"
 generated_pairs_path = input_path + "generated_pairs.csv"
 cleaned_generated_pairs_path = input_path + "cleaned_generated_pairs.csv"
+token_class_generated_pairs_path = input_path + "token_class_generated_pairs.csv"
 
 supported_languages = ["C"]
 
@@ -371,6 +373,17 @@ def clean_genereated_pairs(generated_pairs_df: pd.DataFrame = None):
     return df
 
 
+def add_token_class(generated_pairs_df: pd.DataFrame = None):
+    if generated_pairs_df is None:
+        generated_pairs_df = pd.read_csv(cleaned_generated_pairs_path)
+
+    generated_pairs_df = generated_pairs_df.groupby(
+        ["original_id", "changed_id"]
+    ).apply(mk_add_token_class())
+
+    return generated_pairs_df
+
+
 if __name__ == "__main__":
     os.makedirs(input_path, exist_ok=True)
 
@@ -385,6 +398,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--cleanpairs",
         help="clean the generated source code pairs",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--tokenclass",
+        help="add the token class for the generated source code pairs",
         action="store_true",
     )
     parser.add_argument("-P", help="number of processors to use", default=4, type=int)
@@ -405,3 +423,5 @@ if __name__ == "__main__":
         generate_pairs().to_csv(generated_pairs_path, index=False)
     if args.cleanpairs:
         clean_genereated_pairs().to_csv(cleaned_generated_pairs_path, index=False)
+    if args.tokenclass:
+        add_token_class().to_csv(token_class_generated_pairs_path, index=False)

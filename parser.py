@@ -142,3 +142,83 @@ def mk_add_token_class(suffix="_x"):
         return group_df
 
     return add_token_class
+
+
+def get_id_from_df(token_df):
+    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+    if not tokens:
+        return None
+
+    for i in range(len(token_df)):
+        if check_token(_is_identifier, tokens, i):
+            return tokens[i][1]
+    return None
+
+
+def get_fcall_from_df(token_df):
+    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+    if not tokens:
+        return None
+
+    for i in range(len(token_df)):
+        if check_token(_is_identifier, tokens, i) and check_token(
+            _is_open_p, tokens, i + 1
+        ):
+            return tokens[i][1]
+    return None
+
+
+def get_bop_from_df(token_df):
+    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+    if not tokens:
+        return None
+
+    for i in range(len(token_df)):
+        if check_token(_is_binary, tokens, i):
+            return tokens[i][1]
+    return None
+
+
+def get_assign_from_df(token_df):
+    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+    if not tokens:
+        return None
+
+    for i in range(len(token_df)):
+        if check_token(_is_identifier, tokens, i) and check_token(
+            _is_assign, tokens, i + 1
+        ):
+            return tokens[i][1]
+    return None
+
+def get_keyword_from_df(token_df):
+    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+    if not tokens:
+        return None
+
+    for i in range(len(token_df)):
+        if check_token(_is_keyword, tokens, i):
+            return tokens[i][1]
+    return None
+
+
+def get_unary_from_df(token_df):
+    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+    if not tokens:
+        return None
+
+    for i in range(len(token_df)):
+        if check_token(_is_unary, tokens, i):
+            return tokens[i][1]
+    return None
+
+
+def get_punct_from_df(token_df):
+    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+    if not tokens:
+        return None
+
+    for i in range(len(token_df)):
+        if check_token(_is_punct, tokens, i):
+            return tokens[i][1]
+    return None
