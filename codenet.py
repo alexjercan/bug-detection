@@ -48,8 +48,10 @@ descriptions_path = root_path + "problem_descriptions/"
 
 problem_list_clean_path = input_path + "problem_list_clean.csv"
 generated_pairs_path = input_path + "generated_pairs.csv"
-cleaned_generated_pairs_path = input_path + "cleaned_generated_pairs.csv"
+cleaned_generated_pairs_path = input_path + "generated_pairs_tok.csv"
 token_class_generated_pairs_path = input_path + "token_class_generated_pairs.csv"
+clean_pairs_path = input_path + "clean_pairs.csv"
+error_pairs_path = input_path + "error_pairs.csv"
 
 supported_languages = ["C"]
 
@@ -247,9 +249,7 @@ def generate_pairs(problem_list_df: pd.DataFrame = None):
 
 
 def handle_process(command, input=None, timeout=None):
-    shell = False
-    if not isinstance(command, list):
-        shell = True
+    shell = not isinstance(command, list)
 
     process = subprocess.Popen(
         command,
@@ -263,11 +263,12 @@ def handle_process(command, input=None, timeout=None):
 
     try:
         output, error = process.communicate(input, timeout)
-        return output, error, process.returncode
     except subprocess.TimeoutExpired:
         process.kill()
         process.communicate()
-        raise TimeoutError
+        output, error = None, "TLEError: Time limit exceeded"
+
+    return output, error, process.returncode
 
 
 def run_ctokenizer(file_path):
@@ -293,7 +294,7 @@ def run_tokenizer(problem_id, language, submission_id, filename_ext):
     assert False, "Error"
 
 
-def clean_genereated_pairs_task(
+def tokenize_generated_pairs_task(
     original_id,
     changed_id,
     original_line,
@@ -331,7 +332,7 @@ def clean_genereated_pairs_task(
     return df
 
 
-def clean_genereated_pairs(generated_pairs_df: pd.DataFrame = None):
+def tokenize_generated_pairs(generated_pairs_df: pd.DataFrame = None):
     if generated_pairs_df is None:
         generated_pairs_df = pd.read_csv(generated_pairs_path)
     submissions_diff_dfs = []
@@ -339,7 +340,7 @@ def clean_genereated_pairs(generated_pairs_df: pd.DataFrame = None):
     with tqdm(total=len(generated_pairs_df)) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
             future_to_problem_id = {
-                executor.submit(clean_genereated_pairs_task, *row): row
+                executor.submit(tokenize_generated_pairs_task, *row): row
                 for _, row in generated_pairs_df.iterrows()
             }
 
@@ -384,6 +385,205 @@ def add_token_class(generated_pairs_df: pd.DataFrame = None):
     return generated_pairs_df
 
 
+def exec_c(file_path, input=None, timeout=2.0):
+    with tempfile.NamedTemporaryFile("w+b", suffix=".out", delete=False) as writer:
+        output, error, returncode = handle_process(
+            f"gcc {file_path} -lm -w -O3 -o {writer.name}"
+        )
+        assert returncode == 0, f"Error in gcc {error} {output} {returncode}"
+
+    result = handle_process([writer.name], input, timeout)
+    os.unlink(writer.name)
+
+    return result
+
+
+def exec_file(file_path, input=None, timeout=2.0, language=None):
+    if language == "C":
+        return exec_c(file_path, input, timeout)
+    else:
+        raise NotImplementedError
+
+
+def extract_error_class_python(error, returncode):
+    rs = "|".join(
+        [
+            r"^(\w*Error):.*",
+            r"(\w*Warning):.*",
+        ]
+    )
+
+    p_class = re.compile(rs, re.MULTILINE)
+    error_class = p_class.findall(error)
+    if not error_class:
+        return str(returncode)
+    return functools.reduce(lambda acc, x: acc or x, error_class[0], None)
+
+
+def extract_error_class_extra_python(error, returncode):
+    rs = "|".join(
+        [
+            r"^(\w*Error:.*).*",
+            r"(\w*Warning:.*).*",
+        ]
+    )
+
+    p_class_extra = re.compile(rs, re.MULTILINE)
+    error_class_extra = p_class_extra.findall(error)
+    if not error_class_extra:
+        return error
+    return functools.reduce(lambda acc, x: acc or x, error_class_extra[0], None)
+
+
+def extract_error_class_c(error, returncode):
+    return str(returncode)
+
+
+def extract_error_class_extra_c(error, returncode):
+    rs = "|".join(
+        [
+            r"(undefined reference .*)",
+            r"(\*\*\* stack smashing detected \*\*\*: terminated)",
+            r"(\*\*\* buffer overflow detected \*\*\*: terminated)",
+            r"(munmap_chunk\(\): .*)",
+            r"(segmentation fault \(core dumped\))",
+            r"(error: .*)",
+            r"(relocation truncated to fit: .*)",
+            r"(sysmalloc: .*)",
+            r"(malloc\(\): .*)",
+            r"(free\(\): .*)",
+        ]
+    )
+    p_class_extra = re.compile(rs, re.MULTILINE)
+    error_class_extra = p_class_extra.findall(error)
+    if not error_class_extra:
+        return error
+    return functools.reduce(lambda acc, x: acc or x, error_class_extra[0], None)
+
+
+def extract_error_class(row):
+    language, error, returncode = row
+    if language == "C":
+        return extract_error_class_c(error, returncode)
+    if language == "Python":
+        return extract_error_class_python(error, returncode)
+    return None
+
+
+def extract_error_class_extra(row):
+    language, error, returncode = row
+    if language == "C":
+        return extract_error_class_extra_c(error, returncode)
+    if language == "Python":
+        return extract_error_class_extra_python(error, returncode)
+    return None
+
+
+def add_error_description_task(
+    _id,
+    time_limit,
+    original_id,
+    changed_id,
+    original_line,
+    diff_op,
+    changed_line,
+    original_status,
+    original_language,
+    problem_id,
+    language,
+    filename_ext,
+):
+    file_path = id2submission(problem_id, language, original_id, filename_ext)
+
+    input_path = id2inout(problem_id, name="input")
+    output_path = id2inout(problem_id, name="output")
+
+    with open(input_path, "r") as f:
+        input = f.read()
+
+    timeout = time_limit / 1000 * 2
+
+    try:
+        output, error, returncode = exec_file(file_path, input, timeout, language)
+    except AssertionError as exc:
+        output = None
+        returncode = 1
+        error = f"AssertionError: {exc}"
+
+    return (_id, output, error, returncode)
+
+
+def add_error_description(
+    clean_pairs_df: pd.DataFrame = None, problem_list_df: pd.DataFrame = None
+):
+    if clean_pairs_df is None:
+        clean_pairs_df = pd.read_csv(clean_pairs_path)
+    if problem_list_df is None:
+        problem_list_df = pd.read_csv(problem_list_clean_path, index_col="id")
+
+    errs = []
+
+    time_limit_f = lambda pid: problem_list_df.loc[pid]["time_limit"]
+
+    with tqdm(total=len(clean_pairs_df)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(
+                    add_error_description_task,
+                    _id,
+                    time_limit_f(row["problem_id"]),
+                    *row,
+                ): [_id, time_limit_f(row["problem_id"]), *row]
+                for _id, row in clean_pairs_df.iterrows()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    _id,
+                    time_limit,
+                    original_id,
+                    changed_id,
+                    original_line,
+                    diff_op,
+                    changed_line,
+                    original_status,
+                    original_language,
+                    problem_id,
+                    language,
+                    filename_ext,
+                ) = future_to_problem_id[future]
+                try:
+                    err = future.result()
+                    errs.append(err)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+    errs_df = pd.DataFrame(
+        errs, columns=["index", "output", "error", "returncode"]
+    ).set_index("index")
+    errs_df.index.name = None
+
+    p_error_df = pd.concat(
+        [clean_pairs_df, errs_df[["output", "error", "returncode"]]], axis=1
+    )
+
+    p_error_df["error_class"] = p_error_df[["language", "error", "returncode"]].apply(
+        extract_error_class, axis=1
+    )
+
+    p_error_df["error_class_extra"] = p_error_df[
+        ["language", "error", "returncode"]
+    ].apply(extract_error_class_extra, axis=1)
+
+    return p_error_df
+
+
 if __name__ == "__main__":
     os.makedirs(input_path, exist_ok=True)
 
@@ -396,13 +596,18 @@ if __name__ == "__main__":
         "--genpairs", help="generate the source code pairs", action="store_true"
     )
     parser.add_argument(
-        "--cleanpairs",
-        help="clean the generated source code pairs",
+        "--tokenizepairs",
+        help="tokenize the generated source code pairs",
         action="store_true",
     )
     parser.add_argument(
         "--tokenclass",
         help="add the token class for the generated source code pairs",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--errorclass",
+        help="add the error class for the generated source code pairs",
         action="store_true",
     )
     parser.add_argument("-P", help="number of processors to use", default=4, type=int)
@@ -421,7 +626,9 @@ if __name__ == "__main__":
         clean_problem_list().to_csv(problem_list_clean_path)
     if args.genpairs:
         generate_pairs().to_csv(generated_pairs_path, index=False)
-    if args.cleanpairs:
-        clean_genereated_pairs().to_csv(cleaned_generated_pairs_path, index=False)
+    if args.tokenizepairs:
+        tokenize_generated_pairs().to_csv(cleaned_generated_pairs_path, index=False)
     if args.tokenclass:
         add_token_class().to_csv(token_class_generated_pairs_path, index=False)
+    if args.errorclass:
+        add_error_description().to_csv(error_pairs_path, index=False)
