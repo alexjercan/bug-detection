@@ -267,13 +267,12 @@ def handle_process(
 
 
 def run_ctokenizer(file_path: str) -> pd.DataFrame:
-    grep_command = "grep -P -v '^[ \\t]*#[ ]*include[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
+    grep_command = "grep -P -v '^[ \\t]*#[ ]*(include|import)[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
 
     with tempfile.NamedTemporaryFile("w+t", suffix=".c") as writer:
-        output, error, returncode = handle_process(
-            f"{grep_command} {file_path} | gcc -E -P -xc - -o {writer.name}"
-        )
-        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode}"
+        cmd = f"{grep_command} {file_path} | gcc -E -P -xc++ - -o {writer.name}"
+        output, error, returncode = handle_process(cmd)
+        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode} {cmd}"
         output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
         assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
 
@@ -281,20 +280,20 @@ def run_ctokenizer(file_path: str) -> pd.DataFrame:
 
 
 def run_pythontokenizer(file_path: str) -> pd.DataFrame:
-    output, error, returncode = handle_process(f"{tokenizer_path} {file_path}")
-    assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
+    cmd = f"{tokenizer_path} {file_path}"
+    output, error, returncode = handle_process(cmd)
+    assert returncode == 0, f"Error in tokenize {error} {output} {returncode} {cmd}"
 
     return pd.read_csv(io.StringIO(output), sep=",")
 
 
 def run_cpptokenizer(file_path: str) -> pd.DataFrame:
-    grep_command = "grep -P -v '^[ \\t]*#[ ]*include[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
+    grep_command = "grep -P -v '^[ \\t]*#[ ]*(include|import)[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
 
     with tempfile.NamedTemporaryFile("w+t", suffix=".cpp") as writer:
-        output, error, returncode = handle_process(
-            f"{grep_command} {file_path} | gcc -E -P -xc - -o {writer.name}"
-        )
-        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode}"
+        cmd = f"{grep_command} {file_path} | gcc -E -P -xc - -o {writer.name}"
+        output, error, returncode = handle_process(cmd)
+        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode} {cmd}"
         output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
         assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
 
@@ -302,8 +301,9 @@ def run_cpptokenizer(file_path: str) -> pd.DataFrame:
 
 
 def run_javatokenizer(file_path: str) -> pd.DataFrame:
-    output, error, returncode = handle_process(f"{tokenizer_path} {file_path}")
-    assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
+    cmd = f"{tokenizer_path} {file_path}"
+    output, error, returncode = handle_process(cmd)
+    assert returncode == 0, f"Error in tokenize {error} {output} {returncode} {cmd}"
 
     return pd.read_csv(io.StringIO(output), sep=",")
 
