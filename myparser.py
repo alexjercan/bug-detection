@@ -1,4 +1,5 @@
 import re
+from typing import Callable
 
 import pandas as pd
 
@@ -135,8 +136,8 @@ def get_token_class(token_df, suffix="_x"):
     return None
 
 
-def mk_add_token_class(suffix="_x"):
-    def add_token_class(group_df):
+def mk_add_token_class(suffix: str = "_x") -> Callable[[pd.DataFrame], pd.DataFrame]:
+    def add_token_class(group_df: pd.DataFrame) -> pd.DataFrame:
         token_class = get_token_class(group_df, suffix)
         group_df["token_class"] = token_class
         return group_df

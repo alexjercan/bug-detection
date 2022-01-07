@@ -1,35 +1,24 @@
 import os
 import re
 import io
-import sys
 import wget
-import html
-import pickle
-import random
 import tarfile
 import tempfile
-import itertools
 import functools
 import traceback
 import subprocess
-import multiprocessing
 import concurrent.futures
 
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import more_itertools as more_itertools
 
-from bs4 import BeautifulSoup
-from IPython.display import display, HTML
 from tqdm import tqdm
-from pprint import pprint
-from difflib import Differ, SequenceMatcher
-from collections import Counter
+from difflib import SequenceMatcher
 from argparse import ArgumentParser
 
+from myparser import mk_add_token_class
 from mydifflib import group_diff_chunks, pdiff, single_change
-from parser import mk_add_token_class
+
+from typing import Union
 
 tqdm.pandas()
 
@@ -53,18 +42,20 @@ token_class_generated_pairs_path = input_path + "token_class_generated_pairs.csv
 clean_pairs_path = input_path + "clean_pairs.csv"
 error_pairs_path = input_path + "error_pairs.csv"
 
-supported_languages = ["C"]
+supported_languages = ["C", "Python", "C++", "Java"]
 
 
-def id2desc(problem_id):
+def id2desc(problem_id: str) -> str:
     return descriptions_path + problem_id + ".html"
 
 
-def id2inout(problem_id, name="input"):
+def id2inout(problem_id: str, name: str = "input") -> str:
     return derived_path + "input_output/data/" + problem_id + "/" + name + ".txt"
 
 
-def id2submission(problem_id, language, submission_id, filename_ext):
+def id2submission(
+    problem_id: str, language: str, submission_id: str, filename_ext: str
+) -> str:
     return (
         data_path
         + problem_id
@@ -77,7 +68,9 @@ def id2submission(problem_id, language, submission_id, filename_ext):
     )
 
 
-def read_submission_file(problem_id, language, submission_id, extension):
+def read_submission_file(
+    problem_id: str, language: str, submission_id: str, extension: str
+) -> list[str]:
     """
     Read the source code as a list of lines for a given problem and submission id
     the language and extension are also required to complete the path to the file
@@ -93,7 +86,7 @@ tar_name = "Project_CodeNet.tar.gz"
 tar_path = input_path + tar_name
 
 
-def download_data():
+def download_data() -> None:
     if os.path.exists(root_path):
         print("dataset root dir found")
         return
@@ -105,7 +98,7 @@ def download_data():
         tf.extractall(path=data_path)
 
 
-def clean_problem_list(problem_list_df: pd.DataFrame = None):
+def clean_problem_list(problem_list_df: pd.DataFrame = None) -> pd.DataFrame:
     file_path = metadata_path + "problem_list.csv"
     print(f"Cleaning {file_path}")
 
@@ -121,9 +114,9 @@ def clean_problem_list(problem_list_df: pd.DataFrame = None):
 
     problem_ids = problem_list_df.index.unique()
 
-    input_mask = [os.path.exists(id2inout(problem_id)) for problem_id in problem_ids]
+    input_mask = [os.path.exists(id2inout(str(problem_id))) for problem_id in problem_ids]
 
-    problem_list_df = problem_list_df[input_mask]
+    problem_list_df = problem_list_df.loc[input_mask]
     problem_ids = problem_list_df.index.unique()
 
     return problem_list_df
@@ -131,7 +124,7 @@ def clean_problem_list(problem_list_df: pd.DataFrame = None):
 
 def preprocess_problem_for_language(
     problem_df: pd.DataFrame, problem_id: str, language: str = "C", extension: str = "c"
-):
+) -> list[tuple[str, str, int, str, int, str, str]]:
     submissions_diff_dfs = []
 
     user_ids = problem_df["user_id"].unique()
@@ -177,7 +170,7 @@ def preprocess_problem_for_language(
     return submissions_diff_dfs
 
 
-def generate_pairs_task(problem_id: str):
+def generate_pairs_task(problem_id: str) -> pd.DataFrame:
     columns = [
         "original_id",
         "changed_id",
@@ -193,7 +186,7 @@ def generate_pairs_task(problem_id: str):
         metadata_path + f"{problem_id}.csv", index_col="submission_id"
     )
     if problem_df.empty:
-        return
+        return pd.DataFrame()
 
     problem_df = problem_df[
         (problem_df["status"] != "Compile Error")
@@ -217,7 +210,7 @@ def generate_pairs_task(problem_id: str):
     return pd.DataFrame() if not dfs else pd.concat(dfs, ignore_index=True)
 
 
-def generate_pairs(problem_list_df: pd.DataFrame = None):
+def generate_pairs(problem_list_df: pd.DataFrame = None) -> pd.DataFrame:
     if problem_list_df is None:
         problem_list_df = pd.read_csv(problem_list_clean_path, index_col="id")
     dfs = []
@@ -248,7 +241,9 @@ def generate_pairs(problem_list_df: pd.DataFrame = None):
     return df.sort_values("original_id")
 
 
-def handle_process(command, input=None, timeout=None):
+def handle_process(
+    command: Union[str, list[str]], input: str = None, timeout: float = None
+) -> tuple[str, str, int]:
     shell = not isinstance(command, list)
 
     process = subprocess.Popen(
@@ -266,12 +261,12 @@ def handle_process(command, input=None, timeout=None):
     except subprocess.TimeoutExpired:
         process.kill()
         process.communicate()
-        output, error = None, "TLEError: Time limit exceeded"
+        output, error = "", "TLEError: Time limit exceeded"
 
     return output, error, process.returncode
 
 
-def run_ctokenizer(file_path):
+def run_ctokenizer(file_path: str) -> pd.DataFrame:
     grep_command = "grep -P -v '^[ \\t]*#[ ]*include[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
 
     with tempfile.NamedTemporaryFile("w+t", suffix=".c") as writer:
@@ -285,40 +280,76 @@ def run_ctokenizer(file_path):
     return pd.read_csv(io.StringIO(output), sep=",")
 
 
-def run_tokenizer(problem_id, language, submission_id, filename_ext):
-    if language == "C":
-        return run_ctokenizer(
-            id2submission(problem_id, language, submission_id, filename_ext)
+def run_pythontokenizer(file_path: str) -> pd.DataFrame:
+    output, error, returncode = handle_process(f"{tokenizer_path} {file_path}")
+    assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
+
+    return pd.read_csv(io.StringIO(output), sep=",")
+
+
+def run_cpptokenizer(file_path: str) -> pd.DataFrame:
+    grep_command = "grep -P -v '^[ \\t]*#[ ]*include[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
+
+    with tempfile.NamedTemporaryFile("w+t", suffix=".cpp") as writer:
+        output, error, returncode = handle_process(
+            f"{grep_command} {file_path} | gcc -E -P -xc - -o {writer.name}"
         )
+        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode}"
+        output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
+        assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
+
+    return pd.read_csv(io.StringIO(output), sep=",")
+
+
+def run_javatokenizer(file_path: str) -> pd.DataFrame:
+    output, error, returncode = handle_process(f"{tokenizer_path} {file_path}")
+    assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
+
+    return pd.read_csv(io.StringIO(output), sep=",")
+
+
+def run_tokenizer(
+    problem_id: str, language: str, submission_id: str, filename_ext: str
+) -> pd.DataFrame:
+    file_path = id2submission(problem_id, language, submission_id, filename_ext)
+
+    if language == "C":
+        return run_ctokenizer(file_path)
+    if language == "Python":
+        return run_pythontokenizer(file_path)
+    if language == "C++":
+        return run_cpptokenizer(file_path)
+    if language == "Java":
+        return run_javatokenizer(file_path)
 
     assert False, "Error"
 
 
 def tokenize_generated_pairs_task(
-    original_id,
-    changed_id,
-    original_line,
-    diff_op,
-    changed_line,
-    original_status,
-    original_language,
-    problem_id,
-    language,
-    filename_ext,
-):
+    original_id: str,
+    changed_id: str,
+    original_line: int,
+    diff_op: str,
+    changed_line: int,
+    original_status: str,
+    original_language: str,
+    problem_id: str,
+    language: str,
+    filename_ext: str,
+) -> pd.DataFrame:
     original_tokens_df = run_tokenizer(problem_id, language, original_id, filename_ext)
     changed_tokens_df = run_tokenizer(problem_id, language, changed_id, filename_ext)
 
-    a = original_tokens_df["text"].values
-    b = changed_tokens_df["text"].values
-    s = SequenceMatcher(None, a, b)
+    a = original_tokens_df["text"].values.tolist()
+    b = changed_tokens_df["text"].values.tolist()
+    s: SequenceMatcher = SequenceMatcher(None, a, b)
     opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
     if len(opcodes) != 1:
         return pd.DataFrame()
 
     tag, i1, i2, j1, j2 = opcodes[0]
-    df = original_tokens_df[i1:i2].merge(
-        changed_tokens_df[j1:j2], how="outer", on=["seqnr"]
+    df = original_tokens_df.loc[i1:i2].merge(
+        changed_tokens_df.loc[j1:j2], how="outer", on=["seqnr"]
     )
     df["tag"] = tag
     df["problem_id"] = problem_id
@@ -332,7 +363,7 @@ def tokenize_generated_pairs_task(
     return df
 
 
-def tokenize_generated_pairs(generated_pairs_df: pd.DataFrame = None):
+def tokenize_generated_pairs(generated_pairs_df: pd.DataFrame = None) -> pd.DataFrame:
     if generated_pairs_df is None:
         generated_pairs_df = pd.read_csv(generated_pairs_path)
     submissions_diff_dfs = []
@@ -374,18 +405,20 @@ def tokenize_generated_pairs(generated_pairs_df: pd.DataFrame = None):
     return df
 
 
-def add_token_class(generated_pairs_df: pd.DataFrame = None):
+def add_token_class(generated_pairs_df: pd.DataFrame = None) -> pd.DataFrame:
     if generated_pairs_df is None:
         generated_pairs_df = pd.read_csv(cleaned_generated_pairs_path)
 
-    generated_pairs_df = generated_pairs_df.groupby(
+    token_pairs_df = generated_pairs_df.groupby(
         ["original_id", "changed_id"]
     ).apply(mk_add_token_class())
 
-    return generated_pairs_df
+    return token_pairs_df
 
 
-def exec_c(file_path, input=None, timeout=2.0):
+def exec_c(
+    file_path: str, input: str = None, timeout: float = 2.0
+) -> tuple[str, str, int]:
     with tempfile.NamedTemporaryFile("w+b", suffix=".out", delete=False) as writer:
         output, error, returncode = handle_process(
             f"gcc {file_path} -lm -w -O3 -o {writer.name}"
@@ -398,14 +431,16 @@ def exec_c(file_path, input=None, timeout=2.0):
     return result
 
 
-def exec_file(file_path, input=None, timeout=2.0, language=None):
+def exec_file(
+    file_path: str, input: str = None, timeout: float = 2.0, language: str = None
+) -> tuple[str, str, int]:
     if language == "C":
         return exec_c(file_path, input, timeout)
     else:
         raise NotImplementedError
 
 
-def extract_error_class_python(error, returncode):
+def extract_error_class_python(error: str, returncode: int) -> str:
     rs = "|".join(
         [
             r"^(\w*Error):.*",
@@ -420,7 +455,7 @@ def extract_error_class_python(error, returncode):
     return functools.reduce(lambda acc, x: acc or x, error_class[0], None)
 
 
-def extract_error_class_extra_python(error, returncode):
+def extract_error_class_extra_python(error: str, returncode: int) -> str:
     rs = "|".join(
         [
             r"^(\w*Error:.*).*",
@@ -435,11 +470,11 @@ def extract_error_class_extra_python(error, returncode):
     return functools.reduce(lambda acc, x: acc or x, error_class_extra[0], None)
 
 
-def extract_error_class_c(error, returncode):
+def extract_error_class_c(error: str, returncode: int) -> str:
     return str(returncode)
 
 
-def extract_error_class_extra_c(error, returncode):
+def extract_error_class_extra_c(error: str, returncode: int) -> str:
     rs = "|".join(
         [
             r"(undefined reference .*)",
@@ -461,38 +496,40 @@ def extract_error_class_extra_c(error, returncode):
     return functools.reduce(lambda acc, x: acc or x, error_class_extra[0], None)
 
 
-def extract_error_class(row):
+def extract_error_class(row: pd.Series) -> str:
     language, error, returncode = row
     if language == "C":
         return extract_error_class_c(error, returncode)
     if language == "Python":
         return extract_error_class_python(error, returncode)
-    return None
+
+    return ""
 
 
-def extract_error_class_extra(row):
+def extract_error_class_extra(row: pd.Series) -> str:
     language, error, returncode = row
     if language == "C":
         return extract_error_class_extra_c(error, returncode)
     if language == "Python":
         return extract_error_class_extra_python(error, returncode)
-    return None
+
+    return ""
 
 
 def add_error_description_task(
-    _id,
-    time_limit,
-    original_id,
-    changed_id,
-    original_line,
-    diff_op,
-    changed_line,
-    original_status,
-    original_language,
-    problem_id,
-    language,
-    filename_ext,
-):
+    _id: int,
+    time_limit: float,
+    original_id: str,
+    changed_id: str,
+    original_line: int,
+    diff_op: str,
+    changed_line: int,
+    original_status: str,
+    original_language: str,
+    problem_id: str,
+    language: str,
+    filename_ext: str,
+) -> tuple[int, str, str, int]:
     file_path = id2submission(problem_id, language, original_id, filename_ext)
 
     input_path = id2inout(problem_id, name="input")
@@ -506,7 +543,7 @@ def add_error_description_task(
     try:
         output, error, returncode = exec_file(file_path, input, timeout, language)
     except AssertionError as exc:
-        output = None
+        output = ""
         returncode = 1
         error = f"AssertionError: {exc}"
 
@@ -515,7 +552,7 @@ def add_error_description_task(
 
 def add_error_description(
     clean_pairs_df: pd.DataFrame = None, problem_list_df: pd.DataFrame = None
-):
+) -> pd.DataFrame:
     if clean_pairs_df is None:
         clean_pairs_df = pd.read_csv(clean_pairs_path)
     if problem_list_df is None:
