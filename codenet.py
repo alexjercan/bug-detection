@@ -35,14 +35,51 @@ metadata_path = root_path + "metadata/"
 derived_path = root_path + "derived/"
 descriptions_path = root_path + "problem_descriptions/"
 
-problem_list_clean_path = input_path + "problem_list_clean.csv"
-generated_pairs_path = input_path + "generated_pairs.csv"
-cleaned_generated_pairs_path = input_path + "generated_pairs_tok.csv"
-token_class_generated_pairs_path = input_path + "token_class_generated_pairs.csv"
-clean_pairs_path = input_path + "clean_pairs.csv"
-error_pairs_path = input_path + "error_pairs.csv"
+problem_list_clean_path = input_path + "generated/problem_list_clean.csv"
+generated_pairs_path = input_path + "generated/generated_pairs.csv"
+cleaned_generated_pairs_path = input_path + "generated/generated_pairs_tok.csv"
+token_class_generated_pairs_path = (
+    input_path + "generated/token_class_generated_pairs.csv"
+)
+clean_pairs_path = input_path + "generated/clean_pairs.csv"
+error_pairs_path = input_path + "generated/error_pairs.csv"
 
 supported_languages = ["C", "Python", "C++", "Java"]
+supported_original_languages = [
+    "C++14 (GCC 5.4.1)",
+    "C++ (GCC 9.2.1)",
+    "C++",
+    "JAVA",
+    # "Python (3.4.3)",
+    # "PyPy3 (7.3.0)",
+    "Python (3.8.2)",
+    "C++11",
+    # "PyPy3 (2.4.0)",
+    "C",
+    "C (GCC 9.2.1)",
+    "C++14 (Clang 3.8.0)",
+    "Python",
+    "Java (OpenJDK 11.0.6)",
+    "C (GCC 5.4.1)",
+    # "Python (2.7.6)",
+    "C++ (Clang 10.0.0)",
+    "Java8 (OpenJDK 1.8.0)",
+    "Python3",
+    "C++ (GCC 9.2.1 with AC Library v1.1)",
+    "C++14",
+    "Java (OpenJDK 1.8.0)",
+    "C++ (GCC 5.4.1)",
+    "C (Clang 3.8.0)",
+    "C (Clang 10.0.0)",
+    "C++ (Clang 3.8.0)",
+    "Java7 (OpenJDK 1.7.0)",
+    "C++ (G++ 4.6.4)",
+    "C++ (Clang 10.0.0 with AC Library v1.1)",
+    # "PyPy2 (5.6.0)",
+    "C++11 (GCC 4.8.1)",
+    # "PyPy2 (7.3.0)",
+    # "Python (3.4.2)",
+]
 
 
 def id2desc(problem_id: str) -> str:
@@ -114,7 +151,9 @@ def clean_problem_list(problem_list_df: pd.DataFrame = None) -> pd.DataFrame:
 
     problem_ids = problem_list_df.index.unique()
 
-    input_mask = [os.path.exists(id2inout(str(problem_id))) for problem_id in problem_ids]
+    input_mask = [
+        os.path.exists(id2inout(str(problem_id))) for problem_id in problem_ids
+    ]
 
     problem_list_df = problem_list_df.loc[input_mask]
     problem_ids = problem_list_df.index.unique()
@@ -155,6 +194,7 @@ def preprocess_problem_for_language(
             if not (len(chunks) == 1 and single_change(chunks[0])):
                 continue
 
+            original_language = submission_df.loc[original_id, "original_language"]
             submissions_diff_dfs.append(
                 (
                     original_id,
@@ -163,7 +203,7 @@ def preprocess_problem_for_language(
                     chunks[0][2],
                     chunks[0][3],
                     original_status,
-                    language,
+                    original_language,
                 )
             )
 
@@ -190,7 +230,9 @@ def generate_pairs_task(problem_id: str) -> pd.DataFrame:
 
     problem_df = problem_df[
         (problem_df["status"] != "Compile Error")
+        & (problem_df["status"] != "Wrong Answer")
         & (problem_df["language"].isin(supported_languages))
+        & (problem_df["original_language"].isin(supported_original_languages))
     ]
     grouped_languages = problem_df.groupby("language")
 
@@ -267,12 +309,16 @@ def handle_process(
 
 
 def run_ctokenizer(file_path: str) -> pd.DataFrame:
-    grep_command = "grep -P -v '^[ \\t]*#[ ]*(include|import)[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
+    grep_command = (
+        "grep -P -v '^[ \\t]*#[ \\t]*(include|import)[ \\t]*[\\<|\\\"].*(?<!\\*\\/)$'"
+    )
 
     with tempfile.NamedTemporaryFile("w+t", suffix=".c") as writer:
         cmd = f"{grep_command} {file_path} | gcc -E -P -xc++ - -o {writer.name}"
         output, error, returncode = handle_process(cmd)
-        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode} {cmd}"
+        assert (
+            returncode == 0
+        ), f"Error in grep and gcc {error} {output} {returncode} {cmd}"
         output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
         assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
 
@@ -288,12 +334,16 @@ def run_pythontokenizer(file_path: str) -> pd.DataFrame:
 
 
 def run_cpptokenizer(file_path: str) -> pd.DataFrame:
-    grep_command = "grep -P -v '^[ \\t]*#[ ]*(include|import)[ ]*[\\<|\\\"].*(?<!\\*\\/)$'"
+    grep_command = (
+        "grep -P -v '^[ \\t]*#[ \\t]*(include|import)[ \\t]*[\\<|\\\"].*(?<!\\*\\/)$'"
+    )
 
     with tempfile.NamedTemporaryFile("w+t", suffix=".cpp") as writer:
         cmd = f"{grep_command} {file_path} | gcc -E -P -xc - -o {writer.name}"
         output, error, returncode = handle_process(cmd)
-        assert returncode == 0, f"Error in grep and gcc {error} {output} {returncode} {cmd}"
+        assert (
+            returncode == 0
+        ), f"Error in grep and gcc {error} {output} {returncode} {cmd}"
         output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
         assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
 
@@ -411,7 +461,7 @@ def add_token_class(generated_pairs_df: pd.DataFrame = None) -> pd.DataFrame:
 
     token_pairs_df = generated_pairs_df.groupby(
         ["original_id", "changed_id"]
-    ).apply(mk_add_token_class())
+    ).progress_apply(mk_add_token_class())
 
     return token_pairs_df
 
@@ -431,13 +481,50 @@ def exec_c(
     return result
 
 
+def exec_python(
+    file_path: str, input: str = None, timeout: float = 2.0
+) -> tuple[str, str, int]:
+    return handle_process(["python3", file_path], input, timeout)
+
+
+def exec_cpp(
+    file_path: str, input: str = None, timeout: float = 2.0
+) -> tuple[str, str, int]:
+    with tempfile.NamedTemporaryFile("w+b", suffix=".out", delete=False) as writer:
+        output, error, returncode = handle_process(
+            f"g++ {file_path} -lm -w -O3 -o {writer.name}"
+        )
+        assert returncode == 0, f"Error in g++ {error} {output} {returncode}"
+
+    result = handle_process([writer.name], input, timeout)
+    os.unlink(writer.name)
+
+    return result
+
+
+def exec_java(
+    file_path: str, input: str = None, timeout: float = 2.0
+) -> tuple[str, str, int]:
+    with tempfile.TemporaryDirectory() as dir_path:
+        output, error, returncode = handle_process(f"javac -d {dir_path} {file_path}")
+        assert returncode == 0, f"Error in javac {error} {output} {returncode}"
+
+        classname = os.listdir(dir_path)[0].split(".")[0]
+        return handle_process(f"java -classpath {dir_path} {classname}")
+
+
 def exec_file(
     file_path: str, input: str = None, timeout: float = 2.0, language: str = None
 ) -> tuple[str, str, int]:
     if language == "C":
         return exec_c(file_path, input, timeout)
-    else:
-        raise NotImplementedError
+    if language == "Python":
+        return exec_python(file_path, input, timeout)
+    if language == "C++":
+        return exec_cpp(file_path, input, timeout)
+    if language == "Java":
+        return exec_java(file_path, input, timeout)
+    raise NotImplementedError
 
 
 def extract_error_class_python(error: str, returncode: int) -> str:
@@ -502,6 +589,8 @@ def extract_error_class(row: pd.Series) -> str:
         return extract_error_class_c(error, returncode)
     if language == "Python":
         return extract_error_class_python(error, returncode)
+    if language == "C++":
+        return extract_error_class_c(error, returncode)
 
     return ""
 
@@ -512,6 +601,8 @@ def extract_error_class_extra(row: pd.Series) -> str:
         return extract_error_class_extra_c(error, returncode)
     if language == "Python":
         return extract_error_class_extra_python(error, returncode)
+    if language == "C++":
+        return extract_error_class_extra_c(error, returncode)
 
     return ""
 
@@ -542,10 +633,10 @@ def add_error_description_task(
 
     try:
         output, error, returncode = exec_file(file_path, input, timeout, language)
-    except AssertionError as exc:
+    except Exception as exc:
         output = ""
         returncode = 1
-        error = f"AssertionError: {exc}"
+        error = f"Error: {exc}"
 
     return (_id, output, error, returncode)
 

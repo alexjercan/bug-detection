@@ -5,8 +5,8 @@ import pandas as pd
 
 
 def _is_punct(token):
-    [token_class, token] = token
-    return token_class == "punctuator" and token in [",", ";"]
+    [_, token] = token
+    return token in [",", ";"]
 
 
 def _is_literal(token):
@@ -16,17 +16,21 @@ def _is_literal(token):
         "integerconstant",
         "floatingconstant",
         "characterconstant",
+        "floating",
+        "string",
+        "character",
+        "integer",
     ]
 
 
 def _is_keyword(token):
     [token_class, _] = token
-    return token_class == "keyword"
+    return token_class in ["keyword", "keywords"]
 
 
 def _is_binary(token):
-    [token_class, token] = token
-    return token_class == "punctuator" and token in [
+    [_, token] = token
+    return token in [
         "+",
         "*",
         "-",
@@ -48,13 +52,13 @@ def _is_binary(token):
 
 
 def _is_unary(token):
-    [token_class, token] = token
-    return token_class == "punctuator" and token in ["~", "!", "[", "]"]
+    [_, token] = token
+    return token in ["~", "!", "[", "]"]
 
 
 def _is_assign(token):
-    [token_class, token] = token
-    return token_class == "punctuator" and token in [
+    [_, token] = token
+    return token in [
         "=",
         "+=",
         "-=",
@@ -75,12 +79,12 @@ def _is_assign(token):
 def _is_identifier(token):
     [token_class, token] = token
     p = re.compile("^[A-Za-z_]\w*")
-    return token_class == "identifier" and len(p.findall(token)) > 0
+    return token_class in ["identifier", "name"] and len(p.findall(token)) > 0
 
 
 def _is_open_p(token):
-    [token_class, token] = token
-    return token_class == "punctuator" and token == "("
+    [_, token] = token
+    return token == "("
 
 
 def check_token(func, tokens, n):
