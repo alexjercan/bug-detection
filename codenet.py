@@ -2,6 +2,7 @@ import os
 import re
 import io
 import wget
+import shutil
 import tarfile
 import tempfile
 import functools
@@ -506,6 +507,7 @@ def exec_java(
     file_path: str, input: str = None, timeout: float = 2.0
 ) -> tuple[str, str, int]:
     with tempfile.TemporaryDirectory() as dir_path:
+        file_path = shutil.copy(file_path, dir_path + "/Main.java")
         output, error, returncode = handle_process(f"javac -d {dir_path} {file_path}")
         assert returncode == 0, f"Error in javac {error} {output} {returncode}"
 
@@ -583,6 +585,26 @@ def extract_error_class_extra_c(error: str, returncode: int) -> str:
     return functools.reduce(lambda acc, x: acc or x, error_class_extra[0], None)
 
 
+def extract_error_class_java(error: str, returncode: int) -> str:
+    rs = r"Exception in thread \".*\" (.*)"
+
+    p_class = re.compile(rs, re.MULTILINE)
+    error_class = p_class.findall(error)
+    if not error_class:
+        return error
+    return error_class[0]
+
+
+def extract_error_class_extra_java(error: str, returncode: int) -> str:
+    rs = r"(Exception .*)"
+
+    p_class_extra = re.compile(rs, re.MULTILINE)
+    error_class_extra = p_class_extra.findall(error)
+    if not error_class_extra:
+        return error
+    return error_class_extra[0]
+
+
 def extract_error_class(row: pd.Series) -> str:
     language, error, returncode = row
     if language == "C":
@@ -591,6 +613,8 @@ def extract_error_class(row: pd.Series) -> str:
         return extract_error_class_python(error, returncode)
     if language == "C++":
         return extract_error_class_c(error, returncode)
+    if language == "Java":
+        return extract_error_class_java(error, returncode)
 
     return ""
 
@@ -603,6 +627,8 @@ def extract_error_class_extra(row: pd.Series) -> str:
         return extract_error_class_extra_python(error, returncode)
     if language == "C++":
         return extract_error_class_extra_c(error, returncode)
+    if language == "Java":
+        return extract_error_class_extra_java(error, returncode)
 
     return ""
 
@@ -633,19 +659,22 @@ def add_error_description_task(
 
     try:
         output, error, returncode = exec_file(file_path, input, timeout, language)
-    except Exception as exc:
+    except AssertionError as exc:
         output = ""
         returncode = 1
         error = f"Error: {exc}"
 
-    return (_id, output, error, returncode)
+    error_class = extract_error_class((language, error, returncode))
+    error_class_extra = extract_error_class_extra((language, error, returncode))
+
+    return (_id, output, error, returncode, error_class, error_class_extra)
 
 
 def add_error_description(
     clean_pairs_df: pd.DataFrame = None, problem_list_df: pd.DataFrame = None
 ) -> pd.DataFrame:
     if clean_pairs_df is None:
-        clean_pairs_df = pd.read_csv(clean_pairs_path)
+        clean_pairs_df = pd.read_csv(clean_pairs_path).iloc[:1000]
     if problem_list_df is None:
         problem_list_df = pd.read_csv(problem_list_clean_path, index_col="id")
 
@@ -693,23 +722,19 @@ def add_error_description(
                     pbar.update(1)
 
     errs_df = pd.DataFrame(
-        errs, columns=["index", "output", "error", "returncode"]
+        errs,
+        columns=[
+            "index",
+            "output",
+            "error",
+            "returncode",
+            "error_class",
+            "error_class_extra",
+        ],
     ).set_index("index")
     errs_df.index.name = None
 
-    p_error_df = pd.concat(
-        [clean_pairs_df, errs_df[["output", "error", "returncode"]]], axis=1
-    )
-
-    p_error_df["error_class"] = p_error_df[["language", "error", "returncode"]].apply(
-        extract_error_class, axis=1
-    )
-
-    p_error_df["error_class_extra"] = p_error_df[
-        ["language", "error", "returncode"]
-    ].apply(extract_error_class_extra, axis=1)
-
-    return p_error_df
+    return clean_pairs_df.join(errs_df)
 
 
 if __name__ == "__main__":
