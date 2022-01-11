@@ -674,7 +674,7 @@ def add_error_description(
     clean_pairs_df: pd.DataFrame = None, problem_list_df: pd.DataFrame = None
 ) -> pd.DataFrame:
     if clean_pairs_df is None:
-        clean_pairs_df = pd.read_csv(clean_pairs_path).iloc[:1000]
+        clean_pairs_df = pd.read_csv(clean_pairs_path)
     if problem_list_df is None:
         problem_list_df = pd.read_csv(problem_list_clean_path, index_col="id")
 
