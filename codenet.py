@@ -512,7 +512,7 @@ def exec_java(
         assert returncode == 0, f"Error in javac {error} {output} {returncode}"
 
         classname = os.listdir(dir_path)[0].split(".")[0]
-        return handle_process(f"java -classpath {dir_path} {classname}")
+        return handle_process(["java", "-classpath", dir_path, classname], input, timeout)
 
 
 def exec_file(
@@ -586,7 +586,7 @@ def extract_error_class_extra_c(error: str, returncode: int) -> str:
 
 
 def extract_error_class_java(error: str, returncode: int) -> str:
-    rs = r"Exception in thread \".*\" (.*)"
+    rs = r"Exception in thread \".*\" (.*)[:\n]"
 
     p_class = re.compile(rs, re.MULTILINE)
     error_class = p_class.findall(error)
@@ -655,7 +655,7 @@ def add_error_description_task(
     with open(input_path, "r") as f:
         input = f.read()
 
-    timeout = time_limit / 1000 * 2
+    timeout = time_limit / 1000 * 1.5
 
     try:
         output, error, returncode = exec_file(file_path, input, timeout, language)
