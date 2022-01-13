@@ -586,7 +586,7 @@ def extract_error_class_extra_c(error: str, returncode: int) -> str:
 
 
 def extract_error_class_java(error: str, returncode: int) -> str:
-    rs = r"Exception in thread \".*\" (.*)[:\n]"
+    rs = r"Exception in thread \".*?\" ([^:\n]*)"
 
     p_class = re.compile(rs, re.MULTILINE)
     error_class = p_class.findall(error)
