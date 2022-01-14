@@ -25,6 +25,7 @@ tqdm.pandas()
 
 input_path = "../input/"
 root_path = input_path + "Project_CodeNet/"
+generated_path = input_path + "generated/"
 
 tools_path = "../Project_CodeNet/tools/"
 tokenizer_dir_path = tools_path + "spt-generator/"
@@ -32,18 +33,19 @@ spt_profile = tokenizer_dir_path + "spt.profile"
 tokenizer_path = tokenizer_dir_path + "scripts/run/tokenize.sh"
 
 data_path = root_path + "data/"
+generated_data_path = generated_path + "data/"
 metadata_path = root_path + "metadata/"
 derived_path = root_path + "derived/"
 descriptions_path = root_path + "problem_descriptions/"
 
-problem_list_clean_path = input_path + "generated/problem_list_clean.csv"
-generated_pairs_path = input_path + "generated/generated_pairs.csv"
-cleaned_generated_pairs_path = input_path + "generated/generated_pairs_tok.csv"
-token_class_generated_pairs_path = (
-    input_path + "generated/token_class_generated_pairs.csv"
-)
-clean_pairs_path = input_path + "generated/clean_pairs.csv"
-error_pairs_path = input_path + "generated/error_pairs.csv"
+problem_list_clean_path = generated_path + "problem_list_clean.csv"
+generated_pairs_path = generated_path + "generated_pairs.csv"
+cleaned_generated_pairs_path = generated_path + "generated_pairs_tok.csv"
+token_class_generated_pairs_path = generated_path + "token_class_generated_pairs.csv"
+clean_pairs_path = generated_path + "clean_pairs.csv"
+error_pairs_path = generated_path + "error_pairs.csv"
+clean_error_pairs_path = generated_path + "clean_error_pairs.csv"
+generate_labels_path = generated_path + "generate_labels.csv"
 
 supported_languages = ["C", "Python", "C++", "Java"]
 supported_original_languages = [
@@ -92,7 +94,11 @@ def id2inout(problem_id: str, name: str = "input") -> str:
 
 
 def id2submission(
-    problem_id: str, language: str, submission_id: str, filename_ext: str
+    problem_id: str,
+    language: str,
+    submission_id: str,
+    filename_ext: str,
+    data_path: str = data_path,
 ) -> str:
     return (
         data_path
@@ -107,13 +113,19 @@ def id2submission(
 
 
 def read_submission_file(
-    problem_id: str, language: str, submission_id: str, extension: str
+    problem_id: str,
+    language: str,
+    submission_id: str,
+    extension: str,
+    data_path: str = data_path,
 ) -> list[str]:
     """
     Read the source code as a list of lines for a given problem and submission id
     the language and extension are also required to complete the path to the file
     """
-    with open(id2submission(problem_id, language, submission_id, extension)) as f:
+    with open(
+        id2submission(problem_id, language, submission_id, extension, data_path)
+    ) as f:
         text = f.readlines()
 
     return text
@@ -512,7 +524,9 @@ def exec_java(
         assert returncode == 0, f"Error in javac {error} {output} {returncode}"
 
         classname = os.listdir(dir_path)[0].split(".")[0]
-        return handle_process(["java", "-classpath", dir_path, classname], input, timeout)
+        return handle_process(
+            ["java", "-classpath", dir_path, classname], input, timeout
+        )
 
 
 def exec_file(
@@ -737,6 +751,224 @@ def add_error_description(
     return clean_pairs_df.join(errs_df)
 
 
+def clean_error_list(error_pairs_df: pd.DataFrame = None) -> pd.DataFrame:
+    if error_pairs_df is None:
+        error_pairs_df = pd.read_csv(error_pairs_path)
+
+    error_pairs_df["error_class"] = error_pairs_df["error_class"].replace(
+        ["-11", "139"], "SIGSEGV"
+    )
+    error_pairs_df["error_class"] = error_pairs_df["error_class"].replace(
+        ["-9", "137"], "OutOfMemory"
+    )
+    error_pairs_df["error_class"] = error_pairs_df["error_class"].replace(
+        ["-8", "136"], "SIGFPE"
+    )
+    error_pairs_df["error_class"] = error_pairs_df["error_class"].replace(
+        ["-6", "134"], "SIGABRT"
+    )
+    error_pairs_df["error_class"] = error_pairs_df["error_class"].replace(
+        ["-4", "132"], "SIGILL"
+    )
+
+    error_pairs_df = error_pairs_df[
+        ~(
+            (error_pairs_df["error_class"].str.contains("Error: Main"))
+            | error_pairs_df["error_class"].str.contains("Error: Could")
+            | error_pairs_df["error_class"].str.contains("TLEError")
+        )
+    ]
+    error_pairs_df = error_pairs_df.groupby("error_class").filter(lambda x: len(x) > 1)
+    error_pairs_df = error_pairs_df[
+        error_pairs_df["error_class"].str.contains("[a-zA-Z\.:]+")
+    ]
+
+    return error_pairs_df
+
+
+def tokenize_original_source_after_error_task(
+    original_id: str,
+    changed_id: str,
+    original_line: int,
+    diff_op: str,
+    changed_line: int,
+    original_status: str,
+    original_language: str,
+    problem_id: str,
+    language: str,
+    filename_ext: str,
+    output: str,
+    error: str,
+    returncode: int,
+    error_class: str,
+    error_class_extra: str,
+) -> pd.DataFrame:
+    return (
+        run_tokenizer(problem_id, language, original_id, filename_ext),
+        run_tokenizer(problem_id, language, changed_id, filename_ext),
+    )
+
+
+def tokenize_original_source_after_error(
+    error_pairs_df: pd.DataFrame = None,
+) -> pd.DataFrame:
+    if error_pairs_df is None:
+        error_pairs_df = pd.read_csv(clean_error_pairs_path)
+
+    with tqdm(total=len(error_pairs_df)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(tokenize_original_source_after_error_task, *row): row
+                for _, row in error_pairs_df.iterrows()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    original_id,
+                    changed_id,
+                    original_line,
+                    diff_op,
+                    changed_line,
+                    original_status,
+                    original_language,
+                    problem_id,
+                    language,
+                    filename_ext,
+                    output,
+                    error,
+                    returncode,
+                    error_class,
+                    error_class_extra,
+                ) = future_to_problem_id[future]
+                try:
+                    original_tokenized_df, changed_tokenized_df = future.result()
+                    original_tokenized_path = id2submission(
+                        problem_id, language, original_id, "csv", generated_data_path
+                    )
+                    changed_tokenized_path = id2submission(
+                        problem_id, language, changed_id, "csv", generated_data_path
+                    )
+                    os.makedirs(os.path.dirname(original_tokenized_path), exist_ok=True)
+                    original_tokenized_df.to_csv(original_tokenized_path, index=False)
+                    changed_tokenized_df.to_csv(changed_tokenized_path, index=False)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+
+def generate_labels_task(
+    _id: str,
+    original_id: str,
+    changed_id: str,
+    original_line: int,
+    diff_op: str,
+    changed_line: int,
+    original_status: str,
+    original_language: str,
+    problem_id: str,
+    language: str,
+    filename_ext: str,
+    output: str,
+    error: str,
+    returncode: int,
+    error_class: str,
+    error_class_extra: str,
+) -> pd.DataFrame:
+    original_tokens_df = pd.read_csv(
+        id2submission(problem_id, language, original_id, "csv", generated_data_path)
+    )
+    changed_tokens_df = pd.read_csv(
+        id2submission(problem_id, language, changed_id, "csv", generated_data_path)
+    )
+
+    a = original_tokens_df["text"].values.tolist()
+    b = changed_tokens_df["text"].values.tolist()
+    s: SequenceMatcher = SequenceMatcher(None, a, b)
+
+    opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
+    assert (
+        len(opcodes) == 1
+    ), "The tokens dataframe should be cleaned and such case cannot occur!"
+
+    tag, i1, i2, j1, j2 = opcodes[0]
+
+    df = dict()
+    df["index"] = [_id]
+    df["tag"] = [tag]
+    df["i1"] = [i1]
+    df["i2"] = [i2]
+    df["j1"] = [j1]
+    df["j2"] = [j2]
+    df["problem_id"] = [problem_id]
+    df["original_id"] = [original_id]
+    df["changed_id"] = [changed_id]
+    df["language"] = [language]
+    df["extension"] = [filename_ext]
+    df["original_language"] = [original_language]
+    df["original_status"] = [original_status]
+    df["output"] = [output]
+    df["error"] = [error]
+    df["returncode"] = [returncode]
+    df["error_class"] = [error_class]
+    df["error_class_extra"] = [error_class_extra]
+
+    df = pd.DataFrame.from_dict(df).set_index("index")
+    df.index.name = None
+
+    return df
+
+
+def generate_labels(clean_error_pairs_df: pd.DataFrame = None) -> pd.DataFrame:
+    if clean_error_pairs_df is None:
+        clean_error_pairs_df = pd.read_csv(clean_error_pairs_path)
+
+    generate_labels_dfs = []
+
+    with tqdm(total=len(clean_error_pairs_df)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(generate_labels_task, _id, *row): row
+                for _id, row in clean_error_pairs_df.iterrows()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    original_id,
+                    changed_id,
+                    original_line,
+                    diff_op,
+                    changed_line,
+                    original_status,
+                    original_language,
+                    problem_id,
+                    language,
+                    filename_ext,
+                    output,
+                    error,
+                    returncode,
+                    error_class,
+                    error_class_extra,
+                ) = future_to_problem_id[future]
+                try:
+                    result = future.result()
+                    generate_labels_dfs.append(result)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+    return pd.concat(generate_labels_dfs).sort_index()
+
+
 if __name__ == "__main__":
     os.makedirs(input_path, exist_ok=True)
 
@@ -763,6 +995,19 @@ if __name__ == "__main__":
         help="add the error class for the generated source code pairs",
         action="store_true",
     )
+    parser.add_argument(
+        "--cleanerr",
+        help="clean the generated error messages and keep only the important files",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--tokenerr",
+        help="tokenize the files that remain after the cleaning and create the file structure",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--genlabel", help="generate the labels for the dataset", action="store_true"
+    )
     parser.add_argument("-P", help="number of processors to use", default=4, type=int)
 
     args = parser.parse_args()
@@ -785,3 +1030,9 @@ if __name__ == "__main__":
         add_token_class().to_csv(token_class_generated_pairs_path, index=False)
     if args.errorclass:
         add_error_description().to_csv(error_pairs_path, index=False)
+    if args.cleanerr:
+        clean_error_list().to_csv(clean_error_pairs_path, index=False)
+    if args.tokenerr:
+        tokenize_original_source_after_error()
+    if args.genlabel:
+        generate_labels().to_csv(generate_labels_path, index=False)
