@@ -335,7 +335,7 @@ def run_ctokenizer(file_path: str) -> pd.DataFrame:
         output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
         assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
 
-    return pd.read_csv(io.StringIO(output), sep=",")
+    return pd.read_csv(io.StringIO(output), sep=",", keep_default_na=False)
 
 
 def run_pythontokenizer(file_path: str) -> pd.DataFrame:
@@ -343,7 +343,7 @@ def run_pythontokenizer(file_path: str) -> pd.DataFrame:
     output, error, returncode = handle_process(cmd)
     assert returncode == 0, f"Error in tokenize {error} {output} {returncode} {cmd}"
 
-    return pd.read_csv(io.StringIO(output), sep=",")
+    return pd.read_csv(io.StringIO(output), sep=",", keep_default_na=False)
 
 
 def run_cpptokenizer(file_path: str) -> pd.DataFrame:
@@ -360,7 +360,7 @@ def run_cpptokenizer(file_path: str) -> pd.DataFrame:
         output, error, returncode = handle_process(f"{tokenizer_path} {writer.name}")
         assert returncode == 0, f"Error in tokenize {error} {output} {returncode}"
 
-    return pd.read_csv(io.StringIO(output), sep=",")
+    return pd.read_csv(io.StringIO(output), sep=",", keep_default_na=False)
 
 
 def run_javatokenizer(file_path: str) -> pd.DataFrame:
@@ -368,7 +368,7 @@ def run_javatokenizer(file_path: str) -> pd.DataFrame:
     output, error, returncode = handle_process(cmd)
     assert returncode == 0, f"Error in tokenize {error} {output} {returncode} {cmd}"
 
-    return pd.read_csv(io.StringIO(output), sep=",")
+    return pd.read_csv(io.StringIO(output), sep=",", keep_default_na=False)
 
 
 def run_tokenizer(
@@ -967,6 +967,79 @@ def generate_labels(clean_error_pairs_df: pd.DataFrame = None) -> pd.DataFrame:
                     pbar.update(1)
 
     return pd.concat(generate_labels_dfs).sort_index()
+
+
+def classification_X_y_task(
+    tag: str,
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    problem_id: str,
+    original_id: str,
+    changed_id: str,
+    language: str,
+    extension: str,
+    original_language: str,
+    original_status: str,
+    output: str,
+    error: str,
+    returncode: int,
+    error_class: str,
+    error_class_extra: str,
+):
+    a = pd.read_csv(id2submission(problem_id, language, original_id, "csv", generated_data_path), keep_default_na=False)['text'].values, error_class
+    b = pd.read_csv(id2submission(problem_id, language, changed_id, "csv", generated_data_path), keep_default_na=False)['text'].values, "Accepted"
+
+    return [a, b]
+
+
+def classification_X_y(generate_labels_df: pd.DataFrame = None) -> tuple[list, list]:
+    if generate_labels_df is None:
+        generate_labels_df = pd.read_csv(generate_labels_path)
+
+    results = []
+
+    with tqdm(total=len(generate_labels_df)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(classification_X_y_task, *row): row
+                for _id, row in generate_labels_df.iterrows()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    tag,
+                    i1,
+                    i2,
+                    j1,
+                    j2,
+                    problem_id,
+                    original_id,
+                    changed_id,
+                    language,
+                    extension,
+                    original_language,
+                    original_status,
+                    output,
+                    error,
+                    returncode,
+                    error_class,
+                    error_class_extra,
+                ) = future_to_problem_id[future]
+                try:
+                    result = future.result()
+                    results.extend(result)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{extension} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+    return zip(*results)
 
 
 if __name__ == "__main__":
