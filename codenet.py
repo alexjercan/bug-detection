@@ -10,6 +10,7 @@ import traceback
 import subprocess
 import concurrent.futures
 
+import numpy as np
 import pandas as pd
 
 from tqdm import tqdm
@@ -660,7 +661,7 @@ def add_error_description_task(
     problem_id: str,
     language: str,
     filename_ext: str,
-) -> tuple[int, str, str, int]:
+) -> tuple[int, str, str, int, str, str]:
     file_path = id2submission(problem_id, language, original_id, filename_ext)
 
     input_path = id2inout(problem_id, name="input")
@@ -802,7 +803,7 @@ def tokenize_original_source_after_error_task(
     returncode: int,
     error_class: str,
     error_class_extra: str,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     return (
         run_tokenizer(problem_id, language, original_id, filename_ext),
         run_tokenizer(problem_id, language, changed_id, filename_ext),
@@ -811,7 +812,7 @@ def tokenize_original_source_after_error_task(
 
 def tokenize_original_source_after_error(
     error_pairs_df: pd.DataFrame = None,
-) -> pd.DataFrame:
+):
     if error_pairs_df is None:
         error_pairs_df = pd.read_csv(clean_error_pairs_path)
 
@@ -987,7 +988,7 @@ def classification_X_y_task(
     returncode: int,
     error_class: str,
     error_class_extra: str,
-):
+) -> list[tuple[np.ndarray, str]]:
     a = pd.read_csv(id2submission(problem_id, language, original_id, "csv", generated_data_path), keep_default_na=False)['text'].values, error_class
     b = pd.read_csv(id2submission(problem_id, language, changed_id, "csv", generated_data_path), keep_default_na=False)['text'].values, "Accepted"
 
@@ -1041,6 +1042,83 @@ def classification_X_y(generate_labels_df: pd.DataFrame = None) -> tuple[list, l
 
     return zip(*results)
 
+
+def detection_X_y_task(
+    tag: str,
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    problem_id: str,
+    original_id: str,
+    changed_id: str,
+    language: str,
+    extension: str,
+    original_language: str,
+    original_status: str,
+    output: str,
+    error: str,
+    returncode: int,
+    error_class: str,
+    error_class_extra: str,
+) -> list[tuple[np.ndarray, list]]:
+    a_df = pd.read_csv(id2submission(problem_id, language, original_id, "csv", generated_data_path), keep_default_na=False, index_col="seqnr")
+    b_df = pd.read_csv(id2submission(problem_id, language, changed_id, "csv", generated_data_path), keep_default_na=False, index_col="seqnr")
+
+    line, column = a_df.iloc[i1][["line", "column"]]
+
+    a = a_df['text'].values, [(error_class, line, column)]
+    b = b_df['text'].values, []
+
+    return [a, b]
+
+
+def detection_X_y(generate_labels_df: pd.DataFrame = None) -> tuple[list, list]:
+    if generate_labels_df is None:
+        generate_labels_df = pd.read_csv(generate_labels_path)
+
+    results = []
+
+    with tqdm(total=len(generate_labels_df)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(detection_X_y_task, *row): row
+                for _id, row in generate_labels_df.iterrows()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    tag,
+                    i1,
+                    i2,
+                    j1,
+                    j2,
+                    problem_id,
+                    original_id,
+                    changed_id,
+                    language,
+                    extension,
+                    original_language,
+                    original_status,
+                    output,
+                    error,
+                    returncode,
+                    error_class,
+                    error_class_extra,
+                ) = future_to_problem_id[future]
+                try:
+                    result = future.result()
+                    results.extend(result)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{extension} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+    return zip(*results)
 
 if __name__ == "__main__":
     os.makedirs(input_path, exist_ok=True)
