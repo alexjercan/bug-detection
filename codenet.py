@@ -989,8 +989,22 @@ def classification_X_y_task(
     error_class: str,
     error_class_extra: str,
 ) -> list[tuple[np.ndarray, str]]:
-    a = pd.read_csv(id2submission(problem_id, language, original_id, "csv", generated_data_path), keep_default_na=False)['text'].values, error_class
-    b = pd.read_csv(id2submission(problem_id, language, changed_id, "csv", generated_data_path), keep_default_na=False)['text'].values, "Accepted"
+    a = (
+        pd.read_csv(
+            id2submission(
+                problem_id, language, original_id, "csv", generated_data_path
+            ),
+            keep_default_na=False,
+        )["text"].values,
+        error_class,
+    )
+    b = (
+        pd.read_csv(
+            id2submission(problem_id, language, changed_id, "csv", generated_data_path),
+            keep_default_na=False,
+        )["text"].values,
+        "Accepted",
+    )
 
     return [a, b]
 
@@ -1062,13 +1076,21 @@ def detection_X_y_task(
     error_class: str,
     error_class_extra: str,
 ) -> list[tuple[np.ndarray, list]]:
-    a_df = pd.read_csv(id2submission(problem_id, language, original_id, "csv", generated_data_path), keep_default_na=False, index_col="seqnr")
-    b_df = pd.read_csv(id2submission(problem_id, language, changed_id, "csv", generated_data_path), keep_default_na=False, index_col="seqnr")
+    a_df = pd.read_csv(
+        id2submission(problem_id, language, original_id, "csv", generated_data_path),
+        keep_default_na=False,
+        index_col="seqnr",
+    )
+    b_df = pd.read_csv(
+        id2submission(problem_id, language, changed_id, "csv", generated_data_path),
+        keep_default_na=False,
+        index_col="seqnr",
+    )
 
     line, column = a_df.iloc[i1][["line", "column"]]
 
-    a = a_df['text'].values, [(error_class, line, column)]
-    b = b_df['text'].values, []
+    a = a_df["text"].values, [(error_class, line, column)]
+    b = b_df["text"].values, []
 
     return [a, b]
 
@@ -1119,6 +1141,7 @@ def detection_X_y(generate_labels_df: pd.DataFrame = None) -> tuple[list, list]:
                     pbar.update(1)
 
     return zip(*results)
+
 
 if __name__ == "__main__":
     os.makedirs(input_path, exist_ok=True)
