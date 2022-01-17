@@ -27,6 +27,7 @@ tqdm.pandas()
 input_path = "../input/"
 root_path = input_path + "Project_CodeNet/"
 generated_path = input_path + "generated/"
+generated_v2_path = input_path + "generated_v2/"
 
 tools_path = "../Project_CodeNet/tools/"
 tokenizer_dir_path = tools_path + "spt-generator/"
@@ -35,6 +36,7 @@ tokenizer_path = tokenizer_dir_path + "scripts/run/tokenize.sh"
 
 data_path = root_path + "data/"
 generated_data_path = generated_path + "data/"
+generated_data_v2_path = generated_v2_path + "data/"
 metadata_path = root_path + "metadata/"
 derived_path = root_path + "derived/"
 descriptions_path = root_path + "problem_descriptions/"
@@ -47,6 +49,9 @@ clean_pairs_path = generated_path + "clean_pairs.csv"
 error_pairs_path = generated_path + "error_pairs.csv"
 clean_error_pairs_path = generated_path + "clean_error_pairs.csv"
 generate_labels_path = generated_path + "generate_labels.csv"
+
+problem_list_clean_v2_path = generated_v2_path + "problem_list_clean.csv"
+generated_pairs_v2_path = generated_v2_path + "generated_pairs.csv"
 
 supported_languages = ["C", "Python", "C++", "Java"]
 supported_original_languages = [
@@ -85,6 +90,42 @@ supported_original_languages = [
     # "Python (3.4.2)",
 ]
 
+supported_languages_v2 = ["Python"]
+supported_original_languages_v2 = [
+    "C++14 (GCC 5.4.1)",
+    "C++ (GCC 9.2.1)",
+    "C++",
+    "JAVA",
+    # "Python (3.4.3)",
+    # "PyPy3 (7.3.0)",
+    "Python (3.8.2)",
+    "C++11",
+    # "PyPy3 (2.4.0)",
+    "C",
+    "C (GCC 9.2.1)",
+    "C++14 (Clang 3.8.0)",
+    "Python",
+    "Java (OpenJDK 11.0.6)",
+    "C (GCC 5.4.1)",
+    # "Python (2.7.6)",
+    "C++ (Clang 10.0.0)",
+    "Java8 (OpenJDK 1.8.0)",
+    "Python3",
+    "C++ (GCC 9.2.1 with AC Library v1.1)",
+    "C++14",
+    "Java (OpenJDK 1.8.0)",
+    "C++ (GCC 5.4.1)",
+    "C (Clang 3.8.0)",
+    "C (Clang 10.0.0)",
+    "C++ (Clang 3.8.0)",
+    "Java7 (OpenJDK 1.7.0)",
+    "C++ (G++ 4.6.4)",
+    "C++ (Clang 10.0.0 with AC Library v1.1)",
+    # "PyPy2 (5.6.0)",
+    "C++11 (GCC 4.8.1)",
+    # "PyPy2 (7.3.0)",
+    # "Python (3.4.2)",
+]
 
 def id2desc(problem_id: str) -> str:
     return descriptions_path + problem_id + ".html"
@@ -1143,6 +1184,158 @@ def detection_X_y(generate_labels_df: pd.DataFrame = None) -> tuple[list, list]:
     return zip(*results)
 
 
+def preprocess_problem_for_language_v2(
+    problem_df: pd.DataFrame,
+) -> list[tuple[str, str, int, str, int, str, str]]:
+    submissions_diff_dfs = []
+
+    user_ids = problem_df["user_id"].unique()
+    for user_id in user_ids:
+        submission_df = problem_df[problem_df["user_id"] == user_id].sort_values("date")
+
+        if len(submission_df) < 2:
+            continue
+
+        submission_ids = submission_df.index.unique()
+        for original_id, changed_id in zip(submission_ids, submission_ids[1:]):
+            original_status = submission_df.loc[original_id, "status"]
+            changed_status = submission_df.loc[changed_id, "status"]
+            if not (original_status != "Accepted" and changed_status == "Accepted"):
+                continue
+
+            submissions_diff_dfs.append(
+                (
+                    original_id,
+                    changed_id,
+                    original_status,
+                )
+            )
+
+    return submissions_diff_dfs
+
+
+def generate_pairs_v2_task(problem_id: str) -> pd.DataFrame:
+    columns = [
+        "original_id",
+        "changed_id",
+        "original_status",
+    ]
+    dfs = []
+
+    problem_df = pd.read_csv(
+        metadata_path + f"{problem_id}.csv", index_col="submission_id"
+    )
+    if problem_df.empty:
+        return pd.DataFrame()
+
+    problem_df = problem_df[
+        (problem_df["status"] != "Compile Error")
+        & (problem_df["status"] != "Wrong Answer")
+        & (problem_df["language"].isin(supported_languages_v2))
+        & (problem_df["original_language"].isin(supported_original_languages_v2))
+    ]
+    grouped_languages = problem_df.groupby("language")
+
+    for language, problem_df in grouped_languages:
+        if problem_df.empty:
+            continue
+        xs = preprocess_problem_for_language_v2(problem_df)
+        df = pd.DataFrame(xs, columns=columns)
+        df["problem_id"] = problem_id
+        df["language"] = language
+        df["filename_ext"] = problem_df.iloc[0]["filename_ext"]
+        dfs.append(df)
+
+    return pd.DataFrame() if not dfs else pd.concat(dfs, ignore_index=True)
+
+
+def generate_pairs_v2(problem_list_df: pd.DataFrame = None) -> pd.DataFrame:
+    if problem_list_df is None:
+        problem_list_df = pd.read_csv(problem_list_clean_v2_path, index_col="id")
+    dfs = []
+
+    problem_ids = problem_list_df.index.unique()
+    with tqdm(total=len(problem_ids)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(generate_pairs_v2_task, problem_id): problem_id
+                for problem_id in problem_ids
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                problem_id = future_to_problem_id[future]
+
+                try:
+                    problem_pairs_df = future.result()
+                    dfs.append(problem_pairs_df)
+                except Exception as exc:
+                    print(f"{problem_id} generated an exception: {exc}")
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id}")
+                    pbar.update(1)
+
+    df = pd.concat(dfs, ignore_index=True)
+
+    return df.sort_values("original_id")
+
+
+def tokenize_pairs_v2_task(
+    original_id: str,
+    changed_id: str,
+    original_status: str,
+    problem_id: str,
+    language: str,
+    filename_ext: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    return (
+        run_tokenizer(problem_id, language, original_id, filename_ext),
+        run_tokenizer(problem_id, language, changed_id, filename_ext),
+    )
+
+
+def tokenize_pairs_v2(df: pd.DataFrame = None):
+    if df is None:
+        df = pd.read_csv(generated_pairs_v2_path)
+
+    with tqdm(total=len(df)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(tokenize_pairs_v2_task, *row): row
+                for _, row in df.iterrows()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    original_id,
+                    changed_id,
+                    original_status,
+                    problem_id,
+                    language,
+                    filename_ext,
+                ) = future_to_problem_id[future]
+                try:
+                    original_tokenized_df, changed_tokenized_df = future.result()
+                    original_tokenized_path = id2submission(
+                        problem_id, language, original_id, "csv", generated_data_v2_path
+                    )
+                    changed_tokenized_path = id2submission(
+                        problem_id, language, changed_id, "csv", generated_data_v2_path
+                    )
+                    os.makedirs(os.path.dirname(original_tokenized_path), exist_ok=True)
+                    original_tokenized_df.to_csv(original_tokenized_path, index=False)
+                    os.makedirs(os.path.dirname(changed_tokenized_path), exist_ok=True)
+                    changed_tokenized_df.to_csv(changed_tokenized_path, index=False)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+
 if __name__ == "__main__":
     os.makedirs(input_path, exist_ok=True)
 
@@ -1182,6 +1375,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--genlabel", help="generate the labels for the dataset", action="store_true"
     )
+
+    parser.add_argument(
+        "--cleanlist_v2", help="clean the problem list csv", action="store_true"
+    )
+    parser.add_argument(
+        "--genpairs_v2", help="generate the source code pairs", action="store_true"
+    )
+    parser.add_argument(
+        "--tokpairs_v2",
+        help="tokenize the generated source code pairs",
+        action="store_true",
+    )
+
     parser.add_argument("-P", help="number of processors to use", default=4, type=int)
 
     args = parser.parse_args()
@@ -1210,3 +1416,9 @@ if __name__ == "__main__":
         tokenize_original_source_after_error()
     if args.genlabel:
         generate_labels().to_csv(generate_labels_path, index=False)
+    if args.cleanlist_v2:
+        clean_problem_list().to_csv(problem_list_clean_v2_path)
+    if args.genpairs_v2:
+        generate_pairs_v2().to_csv(generated_pairs_v2_path, index=False)
+    if args.tokpairs_v2:
+        tokenize_pairs_v2()
