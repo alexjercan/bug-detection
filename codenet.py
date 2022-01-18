@@ -52,6 +52,7 @@ generate_labels_path = generated_path + "generate_labels.csv"
 
 problem_list_clean_v2_path = generated_v2_path + "problem_list_clean.csv"
 generated_pairs_v2_path = generated_v2_path + "generated_pairs.csv"
+generated_opcodes_v2_path = generated_v2_path + "generated_opcodes.csv"
 
 supported_languages = ["C", "Python", "C++", "Java"]
 supported_original_languages = [
@@ -126,6 +127,7 @@ supported_original_languages_v2 = [
     # "PyPy2 (7.3.0)",
     # "Python (3.4.2)",
 ]
+
 
 def id2desc(problem_id: str) -> str:
     return descriptions_path + problem_id + ".html"
@@ -1184,6 +1186,32 @@ def detection_X_y(generate_labels_df: pd.DataFrame = None) -> tuple[list, list]:
     return zip(*results)
 
 
+def clean_problem_list_v2(problem_list_df: pd.DataFrame = None) -> pd.DataFrame:
+    file_path = metadata_path + "problem_list.csv"
+    print(f"Cleaning {file_path}")
+
+    if problem_list_df is None:
+        problem_list_df = pd.read_csv(file_path, index_col="id")
+
+    problem_list_df["time_limit"].fillna(
+        problem_list_df["time_limit"].median(), inplace=True
+    )
+    problem_list_df["memory_limit"].fillna(
+        problem_list_df["memory_limit"].median(), inplace=True
+    )
+
+    problem_ids = problem_list_df.index.unique()
+
+    input_mask = [
+        os.path.exists(id2inout(str(problem_id))) for problem_id in problem_ids
+    ]
+
+    problem_list_df = problem_list_df.loc[input_mask]
+    problem_ids = problem_list_df.index.unique()
+
+    return problem_list_df
+
+
 def preprocess_problem_for_language_v2(
     problem_df: pd.DataFrame,
 ) -> list[tuple[str, str, int, str, int, str, str]]:
@@ -1336,6 +1364,91 @@ def tokenize_pairs_v2(df: pd.DataFrame = None):
                     pbar.update(1)
 
 
+def generate_opcodes_v2_task(
+    original_id: str,
+    changed_id: str,
+    original_status: str,
+    problem_id: str,
+    language: str,
+    filename_ext: str,
+) -> pd.DataFrame:
+    original_tokens_df = pd.read_csv(
+        id2submission(problem_id, language, original_id, "csv", generated_data_v2_path),
+        keep_default_na=False,
+        index_col="seqnr",
+    )
+    changed_tokens_df = pd.read_csv(
+        id2submission(problem_id, language, changed_id, "csv", generated_data_v2_path),
+        keep_default_na=False,
+        index_col="seqnr",
+    )
+
+    a = original_tokens_df["text"].values.tolist()
+    b = changed_tokens_df["text"].values.tolist()
+    s: SequenceMatcher = SequenceMatcher(None, a, b)
+    opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
+
+    opcodes_df = pd.DataFrame(dict(zip(["tag", "i1", "i2", "j1", "j2"], zip(*opcodes))))
+    opcodes_df["original_id"] = original_id
+    opcodes_df["changed_id"] = changed_id
+    opcodes_df["problem_id"] = problem_id
+
+    return opcodes_df
+
+
+def generate_opcodes_v2(generated_pairs_df: pd.DataFrame = None) -> pd.DataFrame:
+    if generated_pairs_df is None:
+        generated_pairs_df = pd.read_csv(generated_pairs_v2_path)
+    opcodes_dfs = []
+
+    with tqdm(total=len(generated_pairs_df)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(generate_opcodes_v2_task, *row): row
+                for _, row in generated_pairs_df.iterrows()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    original_id,
+                    changed_id,
+                    original_status,
+                    problem_id,
+                    language,
+                    filename_ext,
+                ) = future_to_problem_id[future]
+                try:
+                    opcodes_df = future.result()
+                    opcodes_dfs.append(opcodes_df)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+    return pd.concat(opcodes_dfs)
+
+
+def tokens2source_python(csv_path):
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    tokens = df["text"].values.tolist()[:-1]
+    # NOTE: The encode.decode is mildly scuffed, but it works
+    return "".join(tokens).encode().decode('unicode-escape')
+
+
+def tokens2source(problem_id, language, original_id):
+    csv_path = id2submission(
+        problem_id, language, original_id, "csv", generated_data_v2_path
+    )
+    if language == "Python":
+        return tokens2source_python(csv_path)
+
+    return ""
+
+
 if __name__ == "__main__":
     os.makedirs(input_path, exist_ok=True)
 
@@ -1387,6 +1500,11 @@ if __name__ == "__main__":
         help="tokenize the generated source code pairs",
         action="store_true",
     )
+    parser.add_argument(
+        "--genopcodes_v2",
+        help="generate the instruction chunks locations with the tag for each original/changed pair",
+        action="store_true",
+    )
 
     parser.add_argument("-P", help="number of processors to use", default=4, type=int)
 
@@ -1417,8 +1535,10 @@ if __name__ == "__main__":
     if args.genlabel:
         generate_labels().to_csv(generate_labels_path, index=False)
     if args.cleanlist_v2:
-        clean_problem_list().to_csv(problem_list_clean_v2_path)
+        clean_problem_list_v2().to_csv(problem_list_clean_v2_path)
     if args.genpairs_v2:
         generate_pairs_v2().to_csv(generated_pairs_v2_path, index=False)
     if args.tokpairs_v2:
         tokenize_pairs_v2()
+    if args.genopcodes_v2:
+        generate_opcodes_v2().to_csv(generated_opcodes_v2_path, index=False)
