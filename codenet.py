@@ -53,6 +53,7 @@ generate_labels_path = generated_path + "generate_labels.csv"
 problem_list_clean_v2_path = generated_v2_path + "problem_list_clean.csv"
 generated_pairs_v2_path = generated_v2_path + "generated_pairs.csv"
 generated_opcodes_v2_path = generated_v2_path + "generated_opcodes.csv"
+error_pairs_v2_path = generated_v2_path + "error_pairs.csv"
 
 supported_languages = ["C", "Python", "C++", "Java"]
 supported_original_languages = [
@@ -1432,14 +1433,14 @@ def generate_opcodes_v2(generated_pairs_df: pd.DataFrame = None) -> pd.DataFrame
     return pd.concat(opcodes_dfs)
 
 
-def tokens2source_python(csv_path):
+def tokens2source_python(csv_path: str) -> str:
     df = pd.read_csv(csv_path, keep_default_na=False)
     tokens = df["text"].values.tolist()[:-1]
     # NOTE: The encode.decode is mildly scuffed, but it works
-    return "".join(tokens).encode().decode('unicode-escape')
+    return "".join(tokens).encode().decode("unicode-escape")
 
 
-def tokens2source(problem_id, language, original_id):
+def tokens2source(problem_id: str, language: str, original_id: str) -> str:
     csv_path = id2submission(
         problem_id, language, original_id, "csv", generated_data_v2_path
     )
@@ -1447,6 +1448,163 @@ def tokens2source(problem_id, language, original_id):
         return tokens2source_python(csv_path)
 
     return ""
+
+
+def apply_token_arrangements(
+    original_tokens_df: pd.DataFrame,
+    changed_tokens_df: pd.DataFrame,
+    opcode: tuple[str, int, int, int, int],
+) -> pd.DataFrame:
+    tag, i1, i2, j1, j2 = opcode
+
+    if tag == "insert":
+        return changed_tokens_df.drop(range(j1, j2))
+
+    first_df = changed_tokens_df[:j1]
+    mid_df = original_tokens_df[i1:i2]
+    second_df = changed_tokens_df[j2:]
+    return pd.concat([first_df, mid_df, second_df]).reset_index(drop=True)
+
+
+def generate_token_arrangements(
+    original_tokens_df: pd.DataFrame,
+    changed_tokens_df: pd.DataFrame,
+    opcodes_df: pd.DataFrame,
+) -> list[tuple[int, pd.DataFrame]]:
+    return [
+        (_id, apply_token_arrangements(original_tokens_df, changed_tokens_df, opcode))
+        for _id, opcode in opcodes_df.iterrows()
+    ]
+
+
+def exec_python_str(source_code: str, input: str = None, timeout: float = 2.0) -> tuple[str, str, int]:
+    return handle_process(["python3", "-c", source_code], input, timeout)
+
+
+def exec_file_str(source_code: str, input: str = None, timeout: float = 2.0, language: str = None) -> tuple[str, str, int]:
+    if language == "Python":
+        return exec_python_str(source_code, input, timeout)
+    raise NotImplementedError
+
+
+def add_error_description_v2_task(
+    time_limit: float,
+    problem_id: str,
+    original_id: str,
+    changed_id: str,
+    language: str,
+    filename_ext: str,
+    opcodes_df: pd.DataFrame,
+) -> list[tuple[int, str, str, int, str, str]]:
+    csv_path = id2submission(
+        problem_id, language, original_id, "csv", generated_data_v2_path
+    )
+    original_df = pd.read_csv(csv_path, keep_default_na=False)
+
+    csv_path = id2submission(
+        problem_id, language, changed_id, "csv", generated_data_v2_path
+    )
+    changed_df = pd.read_csv(csv_path, keep_default_na=False)
+
+    input_path = id2inout(problem_id, name="input")
+    output_path = id2inout(problem_id, name="output")
+
+    with open(input_path, "r") as f:
+        input = f.read()
+
+    timeout = time_limit / 1000 * 1.5
+
+    errs = []
+    variant_dfs = generate_token_arrangements(original_df, changed_df, opcodes_df)
+    for _id, variant_df in variant_dfs:
+        # NOTE: The encode.decode is mildly scuffed, but it works
+        tokens = variant_df["text"].values.tolist()[:-1]
+        source_code = "".join(tokens).encode().decode("unicode-escape")
+
+        try:
+            output, error, returncode = exec_file_str(source_code, input, timeout, language)
+        except AssertionError as exc:
+            output = ""
+            returncode = 1
+            error = f"Error: {exc}"
+
+        error_class = extract_error_class((language, error, returncode))
+        error_class_extra = extract_error_class_extra((language, error, returncode))
+
+        errs.append((_id, output, error, returncode, error_class, error_class_extra))
+
+    return errs
+
+
+def add_error_description_v2(
+    generated_pairs_df: pd.DataFrame = None,
+    problem_list_df: pd.DataFrame = None,
+    generated_opcodes_df: pd.DataFrame = None,
+) -> pd.DataFrame:
+    if generated_pairs_df is None:
+        generated_pairs_df = pd.read_csv(generated_pairs_v2_path)
+    if problem_list_df is None:
+        problem_list_df = pd.read_csv(problem_list_clean_v2_path, index_col="id")
+    if generated_opcodes_df is None:
+        generated_opcodes_df = pd.read_csv(generated_opcodes_v2_path)
+        generated_opcodes_df = generated_opcodes_df.astype({"i1": int, "i2": int, "j1": int, "j2": int})
+
+    time_limit_f = lambda pid: problem_list_df.loc[pid]["time_limit"]
+
+    df = generated_opcodes_df.merge(
+        generated_pairs_df, on=["original_id", "changed_id", "problem_id"]
+    )
+    gs = df.groupby(
+        ["problem_id", "original_id", "changed_id", "language", "filename_ext"]
+    ).groups
+
+    errs = []
+    with tqdm(total=len(gs)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(
+                    add_error_description_v2_task,
+                    time_limit_f(key[0]),
+                    *key,
+                    df.iloc[_ids][["tag", "i1", "i2", "j1", "j2"]],
+                ): key
+                for key, _ids in gs.items()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    problem_id,
+                    original_id,
+                    changed_id,
+                    language,
+                    filename_ext,
+                ) = future_to_problem_id[future]
+                try:
+                    err = future.result()
+                    errs.extend(err)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+    errs_df = pd.DataFrame(
+        errs,
+        columns=[
+            "index",
+            "output",
+            "error",
+            "returncode",
+            "error_class",
+            "error_class_extra",
+        ],
+    ).set_index("index")
+    errs_df.index.name = None
+
+    return generated_opcodes_df.join(errs_df).sort_index()
 
 
 if __name__ == "__main__":
@@ -1505,6 +1663,11 @@ if __name__ == "__main__":
         help="generate the instruction chunks locations with the tag for each original/changed pair",
         action="store_true",
     )
+    parser.add_argument(
+        "--errorclass_v2",
+        help="generate the error description classes for the generated pairs",
+        action="store_true",
+    )
 
     parser.add_argument("-P", help="number of processors to use", default=4, type=int)
 
@@ -1542,3 +1705,5 @@ if __name__ == "__main__":
         tokenize_pairs_v2()
     if args.genopcodes_v2:
         generate_opcodes_v2().to_csv(generated_opcodes_v2_path, index=False)
+    if args.errorclass_v2:
+        add_error_description_v2().to_csv(error_pairs_v2_path, index=False)
