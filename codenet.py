@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("error")
+
 import os
 import re
 import io
@@ -1517,16 +1520,17 @@ def add_error_description_v2_task(
     errs = []
     variant_dfs = generate_token_arrangements(original_df, changed_df, opcodes_df)
     for _id, variant_df in variant_dfs:
-        # NOTE: The encode.decode is mildly scuffed, but it works
         tokens = variant_df["text"].values.tolist()[:-1]
-        source_code = "".join(tokens).encode().decode("unicode-escape")
 
         try:
+            # NOTE: The encode.decode is mildly scuffed, but it works, unless escaped chars like regex
+            source_code = "".join(tokens).encode().decode("unicode-escape")
+
             output, error, returncode = exec_file_str(source_code, input, timeout, language)
-        except AssertionError as exc:
+        except (AssertionError, DeprecationWarning) as exc:
             output = ""
             returncode = 1
-            error = f"Error: {exc}"
+            error = str(exc)
 
         error_class = extract_error_class((language, error, returncode))
         error_class_extra = extract_error_class_extra((language, error, returncode))
@@ -1554,7 +1558,7 @@ def add_error_description_v2(
     df = generated_opcodes_df.merge(
         generated_pairs_df, on=["original_id", "changed_id", "problem_id"]
     )
-    gs = df.groupby(
+    gs = df.iloc[:1000].groupby(
         ["problem_id", "original_id", "changed_id", "language", "filename_ext"]
     ).groups
 
