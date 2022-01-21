@@ -1,10 +1,12 @@
 import warnings
+
 warnings.filterwarnings("error")
 
 import os
 import re
 import io
 import wget
+import codecs
 import shutil
 import tarfile
 import tempfile
@@ -131,6 +133,25 @@ supported_original_languages_v2 = [
     # "PyPy2 (7.3.0)",
     # "Python (3.4.2)",
 ]
+
+ESCAPE_SEQUENCE_RE = re.compile(
+    r"""
+    ( \\U........      # 8-digit hex escapes
+    | \\u....          # 4-digit hex escapes
+    | \\x..            # 2-digit hex escapes
+    | \\[0-7]{1,3}     # Octal escapes
+    | \\N\{[^}]+\}     # Unicode characters by name
+    | \\[\\'"abfnrtv]  # Single-character escapes
+    )""",
+    re.UNICODE | re.VERBOSE,
+)
+
+
+def decode_escapes(s):
+    def decode_match(match):
+        return codecs.decode(match.group(0), "unicode-escape")
+
+    return ESCAPE_SEQUENCE_RE.sub(decode_match, s)
 
 
 def id2desc(problem_id: str) -> str:
@@ -1480,11 +1501,15 @@ def generate_token_arrangements(
     ]
 
 
-def exec_python_str(source_code: str, input: str = None, timeout: float = 2.0) -> tuple[str, str, int]:
+def exec_python_str(
+    source_code: str, input: str = None, timeout: float = 2.0
+) -> tuple[str, str, int]:
     return handle_process(["python3", "-c", source_code], input, timeout)
 
 
-def exec_file_str(source_code: str, input: str = None, timeout: float = 2.0, language: str = None) -> tuple[str, str, int]:
+def exec_file_str(
+    source_code: str, input: str = None, timeout: float = 2.0, language: str = None
+) -> tuple[str, str, int]:
     if language == "Python":
         return exec_python_str(source_code, input, timeout)
     raise NotImplementedError
@@ -1523,10 +1548,11 @@ def add_error_description_v2_task(
         tokens = variant_df["text"].values.tolist()[:-1]
 
         try:
-            # NOTE: The encode.decode is mildly scuffed, but it works, unless escaped chars like regex
-            source_code = "".join(tokens).encode().decode("unicode-escape")
+            source_code = decode_escapes("".join(tokens))
 
-            output, error, returncode = exec_file_str(source_code, input, timeout, language)
+            output, error, returncode = exec_file_str(
+                source_code, input, timeout, language
+            )
         except (AssertionError, DeprecationWarning) as exc:
             output = ""
             returncode = 1
@@ -1551,14 +1577,16 @@ def add_error_description_v2(
         problem_list_df = pd.read_csv(problem_list_clean_v2_path, index_col="id")
     if generated_opcodes_df is None:
         generated_opcodes_df = pd.read_csv(generated_opcodes_v2_path)
-        generated_opcodes_df = generated_opcodes_df.astype({"i1": int, "i2": int, "j1": int, "j2": int})
+        generated_opcodes_df = generated_opcodes_df.astype(
+            {"i1": int, "i2": int, "j1": int, "j2": int}
+        )
 
     time_limit_f = lambda pid: problem_list_df.loc[pid]["time_limit"]
 
     df = generated_opcodes_df.merge(
         generated_pairs_df, on=["original_id", "changed_id", "problem_id"]
     )
-    gs = df.iloc[:1000].groupby(
+    gs = df.groupby(
         ["problem_id", "original_id", "changed_id", "language", "filename_ext"]
     ).groups
 
