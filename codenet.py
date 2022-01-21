@@ -6,6 +6,7 @@ import os
 import re
 import io
 import wget
+import pickle
 import codecs
 import shutil
 import tarfile
@@ -59,6 +60,7 @@ problem_list_clean_v2_path = generated_v2_path + "problem_list_clean.csv"
 generated_pairs_v2_path = generated_v2_path + "generated_pairs.csv"
 generated_opcodes_v2_path = generated_v2_path + "generated_opcodes.csv"
 error_pairs_v2_path = generated_v2_path + "error_pairs.csv"
+detection_X_y_v2_path = generated_v2_path + "detection_x_y_v2.pkl"
 
 supported_languages = ["C", "Python", "C++", "Java"]
 supported_original_languages = [
@@ -1676,7 +1678,7 @@ def detection_X_y_v2(error_pairs_df: pd.DataFrame = None) -> tuple[list, list]:
         )
 
     df = error_pairs_df
-    gs = df.iloc[:1].groupby(
+    gs = df.groupby(
         ["problem_id", "original_id", "changed_id", "language", "filename_ext"]
     ).groups
 
@@ -1778,6 +1780,11 @@ if __name__ == "__main__":
         help="generate the error description classes for the generated pairs",
         action="store_true",
     )
+    parser.add_argument(
+        "--detection_v2",
+        help="generate the X and y for the detection stage of the model",
+        action="store_true",
+    )
 
     parser.add_argument("-P", help="number of processors to use", default=4, type=int)
 
@@ -1817,3 +1824,8 @@ if __name__ == "__main__":
         generate_opcodes_v2().to_csv(generated_opcodes_v2_path, index=False)
     if args.errorclass_v2:
         add_error_description_v2().to_csv(error_pairs_v2_path, index=False)
+    if args.detection_v2:
+        a = detection_X_y_v2()
+        with open(detection_X_y_v2_path, 'wb') as f:
+            pickle.dump(a, f)
+
