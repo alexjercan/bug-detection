@@ -1636,7 +1636,86 @@ def add_error_description_v2(
     ).set_index("index")
     errs_df.index.name = None
 
-    return generated_opcodes_df.join(errs_df).sort_index()
+    df = generated_opcodes_df.join(errs_df).sort_index()
+    df = df[df['returncode'] != 0].dropna(subset=['error_class'])
+    df = generated_pairs_df.merge(df)
+
+    return df
+
+
+def detection_X_y_v2_task(
+    problem_id: str,
+    original_id: str,
+    changed_id: str,
+    language: str,
+    filename_ext: str,
+    df: pd.DataFrame,
+) -> list[tuple[np.ndarray, list]]:
+    a_df = pd.read_csv(
+        id2submission(problem_id, language, original_id, "csv", generated_data_v2_path),
+        keep_default_na=False,
+        index_col="seqnr",
+    )
+    b_df = pd.read_csv(
+        id2submission(problem_id, language, changed_id, "csv", generated_data_v2_path),
+        keep_default_na=False,
+        index_col="seqnr",
+    )
+
+    a = a_df["text"].values, df.values.tolist()
+    b = b_df["text"].values, []
+
+    return [a, b]
+
+
+def detection_X_y_v2(error_pairs_df: pd.DataFrame = None) -> tuple[list, list]:
+    if error_pairs_df is None:
+        error_pairs_df = pd.read_csv(error_pairs_v2_path)
+        error_pairs_df = error_pairs_df.astype(
+            {"i1": int, "i2": int, "j1": int, "j2": int}
+        )
+
+    df = error_pairs_df
+    gs = df.iloc[:1].groupby(
+        ["problem_id", "original_id", "changed_id", "language", "filename_ext"]
+    ).groups
+
+    results = []
+
+    with tqdm(total=len(gs)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(
+                    detection_X_y_v2_task,
+                    *key,
+                    df.iloc[_ids][["i1", "i2", "error_class"]],
+                ): key
+                for key, _ids in gs.items()
+            }
+            print("SUGI PULA")
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    problem_id,
+                    original_id,
+                    changed_id,
+                    language,
+                    filename_ext,
+                ) = future_to_problem_id[future]
+                try:
+                    result = future.result()
+                    results.extend(result)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+
+    return zip(*results)
 
 
 if __name__ == "__main__":
@@ -1739,3 +1818,4 @@ if __name__ == "__main__":
         generate_opcodes_v2().to_csv(generated_opcodes_v2_path, index=False)
     if args.errorclass_v2:
         add_error_description_v2().to_csv(error_pairs_v2_path, index=False)
+    detection_X_y_v2()
