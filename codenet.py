@@ -1692,7 +1692,6 @@ def detection_X_y_v2(error_pairs_df: pd.DataFrame = None) -> tuple[list, list]:
                 ): key
                 for key, _ids in gs.items()
             }
-            print("SUGI PULA")
 
             for future in concurrent.futures.as_completed(future_to_problem_id):
                 (
@@ -1818,4 +1817,3 @@ if __name__ == "__main__":
         generate_opcodes_v2().to_csv(generated_opcodes_v2_path, index=False)
     if args.errorclass_v2:
         add_error_description_v2().to_csv(error_pairs_v2_path, index=False)
-    detection_X_y_v2()
