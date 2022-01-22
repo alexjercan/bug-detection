@@ -1,7 +1,3 @@
-import warnings
-
-warnings.filterwarnings("error")
-
 import os
 import re
 import io
@@ -11,6 +7,7 @@ import codecs
 import shutil
 import tarfile
 import tempfile
+import warnings
 import functools
 import traceback
 import subprocess
@@ -415,6 +412,13 @@ def run_pythontokenizer(file_path: str) -> pd.DataFrame:
     assert returncode == 0, f"Error in tokenize {error} {output} {returncode} {cmd}"
 
     return pd.read_csv(io.StringIO(output), sep=",", keep_default_na=False)
+
+
+def run_pythontokenizer_str(source_code: str) -> pd.DataFrame:
+    with tempfile.NamedTemporaryFile("w+t", suffix=".py") as writer:
+        writer.write(source_code)
+        writer.flush()
+        return codenet.run_pythontokenizer(writer.name)
 
 
 def run_cpptokenizer(file_path: str) -> pd.DataFrame:
@@ -1639,7 +1643,7 @@ def add_error_description_v2(
     errs_df.index.name = None
 
     df = generated_opcodes_df.join(errs_df).sort_index()
-    df = df[df['returncode'] != 0].dropna(subset=['error_class'])
+    df = df[df["returncode"] != 0].dropna(subset=["error_class"])
     df = generated_pairs_df.merge(df)
 
     return df
@@ -1715,11 +1719,16 @@ def detection_X_y_v2(error_pairs_df: pd.DataFrame = None) -> tuple[list, list]:
                     pbar.set_description(f"Processing {problem_id} {original_id}")
                     pbar.update(1)
 
-
     return zip(*results)
 
 
+def prediction2err(token_df: pd.DataFrame, prediction: np.ndarray) -> pd.DataFrame:
+    token_df["prediction"] = prediction
+    return token_df[token_df["prediction"] != "Accepted"]
+
+
 if __name__ == "__main__":
+    warnings.filterwarnings("error")
     os.makedirs(input_path, exist_ok=True)
 
     parser = ArgumentParser()
@@ -1826,6 +1835,5 @@ if __name__ == "__main__":
         add_error_description_v2().to_csv(error_pairs_v2_path, index=False)
     if args.detection_v2:
         a = detection_X_y_v2()
-        with open(detection_X_y_v2_path, 'wb') as f:
+        with open(detection_X_y_v2_path, "wb") as f:
             pickle.dump(a, f)
-
