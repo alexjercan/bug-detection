@@ -418,7 +418,7 @@ def run_pythontokenizer_str(source_code: str) -> pd.DataFrame:
     with tempfile.NamedTemporaryFile("w+t", suffix=".py") as writer:
         writer.write(source_code)
         writer.flush()
-        return codenet.run_pythontokenizer(writer.name)
+        return run_pythontokenizer(writer.name)
 
 
 def run_cpptokenizer(file_path: str) -> pd.DataFrame:
