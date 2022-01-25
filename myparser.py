@@ -149,8 +149,8 @@ def mk_add_token_class(suffix: str = "_x") -> Callable[[pd.DataFrame], pd.DataFr
     return add_token_class
 
 
-def get_id_from_df(token_df):
-    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+def get_id_from_df(token_df, suffix="_x"):
+    tokens = token_df[["class" + suffix, "text" + suffix]].dropna().values.tolist()
     if not tokens:
         return None
 
@@ -160,8 +160,8 @@ def get_id_from_df(token_df):
     return None
 
 
-def get_fcall_from_df(token_df):
-    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+def get_fcall_from_df(token_df, suffix="_x"):
+    tokens = token_df[["class" + suffix, "text" + suffix]].dropna().values.tolist()
     if not tokens:
         return None
 
@@ -173,8 +173,8 @@ def get_fcall_from_df(token_df):
     return None
 
 
-def get_bop_from_df(token_df):
-    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+def get_bop_from_df(token_df, suffix="_x"):
+    tokens = token_df[["class" + suffix, "text" + suffix]].dropna().values.tolist()
     if not tokens:
         return None
 
@@ -184,8 +184,8 @@ def get_bop_from_df(token_df):
     return None
 
 
-def get_assign_from_df(token_df):
-    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+def get_assign_from_df(token_df, suffix="_x"):
+    tokens = token_df[["class" + suffix, "text" + suffix]].dropna().values.tolist()
     if not tokens:
         return None
 
@@ -196,8 +196,9 @@ def get_assign_from_df(token_df):
             return tokens[i][1]
     return None
 
-def get_keyword_from_df(token_df):
-    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+
+def get_keyword_from_df(token_df, suffix="_x"):
+    tokens = token_df[["class" + suffix, "text" + suffix]].dropna().values.tolist()
     if not tokens:
         return None
 
@@ -207,8 +208,8 @@ def get_keyword_from_df(token_df):
     return None
 
 
-def get_unary_from_df(token_df):
-    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+def get_unary_from_df(token_df, suffix="_x"):
+    tokens = token_df[["class" + suffix, "text" + suffix]].dropna().values.tolist()
     if not tokens:
         return None
 
@@ -218,8 +219,8 @@ def get_unary_from_df(token_df):
     return None
 
 
-def get_punct_from_df(token_df):
-    tokens = token_df[["class_x", "text_x"]].dropna().values.tolist()
+def get_punct_from_df(token_df, suffix="_x"):
+    tokens = token_df[["class" + suffix, "text" + suffix]].dropna().values.tolist()
     if not tokens:
         return None
 

@@ -58,6 +58,7 @@ generated_pairs_v2_path = generated_v2_path + "generated_pairs.csv"
 generated_opcodes_v2_path = generated_v2_path + "generated_opcodes.csv"
 error_pairs_v2_path = generated_v2_path + "error_pairs.csv"
 detection_X_y_v2_path = generated_v2_path + "detection_x_y_v2.pkl"
+parser_tags_v2_path = generated_v2_path + "parser_tags_v2.pkl"
 
 supported_languages = ["C", "Python", "C++", "Java"]
 supported_original_languages = [
@@ -1722,6 +1723,79 @@ def detection_X_y_v2(error_pairs_df: pd.DataFrame = None) -> tuple[list, list]:
     return zip(*results)
 
 
+def add_parser_tags_v2_task(
+    problem_id: str,
+    original_id: str,
+    changed_id: str,
+    language: str,
+    filename_ext: str,
+    df: pd.DataFrame,
+) -> list[tuple[np.ndarray, list]]:
+    a_df = pd.read_csv(
+        id2submission(problem_id, language, original_id, "csv", generated_data_v2_path),
+        keep_default_na=False,
+    )
+
+    a_df = a_df[["seqnr", "text", "class"]]
+    a_dfs = []
+
+    for _, err in df.iterrows():
+        i1, i2, error_class = err
+        _df = a_df[i1:i2].copy()
+        _df["error_class"] = error_class
+        a_dfs.append(_df)
+
+    return a_dfs
+
+
+def add_parser_tags_v2(error_pairs_df: pd.DataFrame = None) -> tuple[list, list]:
+    if error_pairs_df is None:
+        error_pairs_df = pd.read_csv(error_pairs_v2_path)
+        error_pairs_df = error_pairs_df.astype(
+            {"i1": int, "i2": int, "j1": int, "j2": int}
+        )
+
+    df = error_pairs_df
+    gs = df.groupby(
+        ["problem_id", "original_id", "changed_id", "language", "filename_ext"]
+    ).groups
+
+    results = []
+
+    with tqdm(total=len(gs)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(
+                    add_parser_tags_v2_task,
+                    *key,
+                    df.iloc[_ids][["i1", "i2", "error_class"]],
+                ): key
+                for key, _ids in gs.items()
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    problem_id,
+                    original_id,
+                    changed_id,
+                    language,
+                    filename_ext,
+                ) = future_to_problem_id[future]
+                try:
+                    result = future.result()
+                    results.extend(result)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(f"Processing {problem_id} {original_id}")
+                    pbar.update(1)
+
+    return results
+
+
 def prediction2err(token_df: pd.DataFrame, prediction: np.ndarray) -> pd.DataFrame:
     token_df["prediction"] = prediction
     return token_df[token_df["prediction"] != "Accepted"]
@@ -1794,6 +1868,11 @@ if __name__ == "__main__":
         help="generate the X and y for the detection stage of the model",
         action="store_true",
     )
+    parser.add_argument(
+        "--parsertag_v2",
+        help="generate the X list of parser tags",
+        action="store_true",
+    )
 
     parser.add_argument("-P", help="number of processors to use", default=4, type=int)
 
@@ -1836,4 +1915,8 @@ if __name__ == "__main__":
     if args.detection_v2:
         a = detection_X_y_v2()
         with open(detection_X_y_v2_path, "wb") as f:
+            pickle.dump(a, f)
+    if args.parsertag_v2:
+        a = add_parser_tags_v2()
+        with open(parser_tags_v2_path, "wb") as f:
             pickle.dump(a, f)
