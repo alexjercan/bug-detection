@@ -120,6 +120,8 @@ def get_token_class(token_df, suffix="_x"):
     if not tokens:
         return None
 
+    if check_tokens(_is_keyword, tokens):
+        return "keyword"
     if check_sequence(_function_call_seq, tokens):
         return "call"
     if check_sequence(_variable_assign_seq, tokens) or check_tokens(_is_assign, tokens):
@@ -132,8 +134,6 @@ def get_token_class(token_df, suffix="_x"):
         return "literal"
     if check_tokens(_is_identifier, tokens):
         return "identifier"
-    if check_tokens(_is_keyword, tokens):
-        return "keyword"
     if check_tokens(_is_punct, tokens):
         return "punctuator"
 
