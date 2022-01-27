@@ -1506,14 +1506,15 @@ def exec_file_str(
 
 
 def tokens2str(df: pd.DataFrame, language: str) -> str:
+    tokens = df["text"].values.tolist()[:-1]
     if language == "Python":
-        return tokens2str_python(df)
+        return tokens2str_python(tokens)
 
     return None
 
 
-def tokens2str_python(df: pd.DataFrame) -> str:
-    return "".join(df["text"].values.tolist()[:-1])
+def tokens2str_python(tokens: list[str]) -> str:
+    return "".join(tokens)
 
 
 def add_error_description_v2_task(
@@ -1905,7 +1906,7 @@ if __name__ == "__main__":
     if args.genopcodes_v2:
         generate_opcodes_v2().to_csv(generated_opcodes_v2_path, index=False)
     if args.errorclass_v2:
-        add_error_description_v2()#.to_csv(error_pairs_v2_path, index=False)
+        add_error_description_v2().to_csv(error_pairs_v2_path, index=False)
     if args.detection_v2:
         a = detection_X_y_v2()
         with open(detection_X_y_v2_path, "wb") as f:
