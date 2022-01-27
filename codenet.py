@@ -1464,23 +1464,6 @@ def generate_opcodes_v2(generated_pairs_df: pd.DataFrame = None) -> pd.DataFrame
     return pd.concat(opcodes_dfs)
 
 
-def tokens2source_python(csv_path: str) -> str:
-    df = pd.read_csv(csv_path, keep_default_na=False)
-    tokens = df["text"].values.tolist()[:-1]
-    # NOTE: The encode.decode is mildly scuffed, but it works
-    return "".join(tokens).encode().decode("unicode-escape")
-
-
-def tokens2source(problem_id: str, language: str, original_id: str) -> str:
-    csv_path = id2submission(
-        problem_id, language, original_id, "csv", generated_data_v2_path
-    )
-    if language == "Python":
-        return tokens2source_python(csv_path)
-
-    return ""
-
-
 def apply_token_arrangements(
     original_tokens_df: pd.DataFrame,
     changed_tokens_df: pd.DataFrame,
@@ -1522,6 +1505,17 @@ def exec_file_str(
     raise NotImplementedError
 
 
+def tokens2str(df: pd.DataFrame, language: str) -> str:
+    if language == "Python":
+        return tokens2str_python(df)
+
+    return None
+
+
+def tokens2str_python(df: pd.DataFrame) -> str:
+    return "".join(df["text"].values.tolist()[:-1])
+
+
 def add_error_description_v2_task(
     time_limit: float,
     problem_id: str,
@@ -1552,10 +1546,10 @@ def add_error_description_v2_task(
     errs = []
     variant_dfs = generate_token_arrangements(original_df, changed_df, opcodes_df)
     for _id, variant_df in variant_dfs:
-        tokens = variant_df["text"].values.tolist()[:-1]
+        tokens_df = variant_df[["text", "class"]]
 
         try:
-            source_code = decode_escapes("".join(tokens))
+            source_code = decode_escapes(tokens2str(tokens_df, language))
 
             output, error, returncode = exec_file_str(
                 source_code, input, timeout, language
@@ -1911,7 +1905,7 @@ if __name__ == "__main__":
     if args.genopcodes_v2:
         generate_opcodes_v2().to_csv(generated_opcodes_v2_path, index=False)
     if args.errorclass_v2:
-        add_error_description_v2().to_csv(error_pairs_v2_path, index=False)
+        add_error_description_v2()#.to_csv(error_pairs_v2_path, index=False)
     if args.detection_v2:
         a = detection_X_y_v2()
         with open(detection_X_y_v2_path, "wb") as f:
