@@ -278,6 +278,10 @@ def tokenize_pairs_task(
 
 
 def tokenize_pairs_codenet(force: bool = False):
+    if os.path.exists(generated_data_path) and not force:
+        print("Tokens already generated. skiping...")
+        return
+
     df = pd.read_csv(generated_pairs_path)
 
     with tqdm(total=len(df)) as pbar:
@@ -355,8 +359,7 @@ def generate_opcodes_codenet(force: bool = False) -> pd.DataFrame:
         print("Opcodes already generated. skiping...")
         return
 
-    if generated_pairs_df is None:
-        generated_pairs_df = pd.read_csv(generated_pairs_path)
+    generated_pairs_df = pd.read_csv(generated_pairs_path)
     opcodes_dfs = []
 
     with tqdm(total=len(generated_pairs_df)) as pbar:
@@ -522,5 +525,5 @@ if __name__ == "__main__":
     clean_codenet()
     generate_pairs_codenet()
     tokenize_pairs_codenet()
-    # generate_opcodes_codenet()
-    # add_error_description_codenet()
+    generate_opcodes_codenet()
+    add_error_description_codenet()
