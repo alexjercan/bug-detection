@@ -512,7 +512,6 @@ def add_error_description_codenet(force: bool = False) -> pd.DataFrame:
     errs_df.index.name = None
 
     df = generated_opcodes_df.join(errs_df).sort_index()
-    df = df[df["returncode"] != 0].dropna(subset=["error_class"])
     df = generated_pairs_df.merge(df)
 
     df.to_csv(error_pairs_path, index=False)
