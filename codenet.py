@@ -340,7 +340,7 @@ def decode_escapes(s):
 
 
 def tokens2str_python(tokens: list[str]) -> str:
-    return "".join(tokens)
+    return decode_escapes("".join(tokens))
 
 
 def tokens2str(df: pd.DataFrame, language: str) -> str:
@@ -699,7 +699,7 @@ def add_error_description_task(
         tokens_df = variant_df[["text", "class"]]
 
         try:
-            source_code = decode_escapes(tokens2str(tokens_df, language))
+            source_code = tokens2str(tokens_df, language)
 
             output, error, returncode = exec_file_str(
                 source_code, input, timeout, language
@@ -788,6 +788,30 @@ def add_error_description_codenet(force: bool = False) -> pd.DataFrame:
     df = generated_pairs_df.merge(df)
 
     df.to_csv(error_pairs_path, index=False)
+
+
+def generate_treesitter_Xy(force: bool = True) -> pd.DataFrame:
+    if os.path.exists(treesitter_Xy_path) and not force:
+        print("Tree Sitter Xy already generated. skiping...")
+        return
+
+    problem_list_df = pd.read_csv(problem_list_clean_path, index_col="id")
+    generated_pairs_df = pd.read_csv(generated_pairs_path)
+    error_pairs_df = pd.read_csv(error_pairs_path)
+
+    # TODO 1: group the submissions by error_pairs_df
+
+    # TODO 2: For each pair read the source code and the tokens
+
+    # TODO 3: Tree Sitter the source code
+
+    # TODO 4: Walk the tree and for each node check the position (line and column)
+    # Label that node with the label corresponding to the token at the same position
+
+    # TODO 5: Save the information for each problem similar to the tokens in csv files
+    # Columns: Token, Label
+
+    return pd.DataFrame()
 
 
 if __name__ == "__main__":
