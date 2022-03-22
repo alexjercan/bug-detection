@@ -10,11 +10,13 @@ import traceback
 import subprocess
 import concurrent.futures
 
+import numpy as np
 import pandas as pd
 
 from tqdm import tqdm
 from typing import Union
 from difflib import SequenceMatcher
+from tree_sitter import Language, Parser, Tree
 
 tqdm.pandas()
 
@@ -26,6 +28,7 @@ generated_path = input_path + "generated/"
 
 data_path = root_path + "data/"
 generated_data_path = generated_path + "data/"
+generated_treedata_path = generated_path + "treedata/"
 metadata_path = root_path + "metadata/"
 derived_path = root_path + "derived/"
 descriptions_path = root_path + "problem_descriptions/"
@@ -75,6 +78,9 @@ supported_original_languages = [
 data_url = "https://dax-cdn.cdn.appdomain.cloud/dax-project-codenet/1.0.0"
 tar_name = "Project_CodeNet.tar.gz"
 tar_path = input_path + tar_name
+
+vendor_python_treesitter_path = "../vendor/tree-sitter-python"
+build_languages_path = "../build/my-languages.so"
 
 
 def handle_process(
@@ -591,7 +597,9 @@ def tokenize_pairs_codenet(force: bool = False):
                     )
                     traceback.print_exc()
                 else:
-                    pbar.set_description(f"[Tokenize Pairs] Processing {problem_id} {original_id}")
+                    pbar.set_description(
+                        f"[Tokenize Pairs] Processing {problem_id} {original_id}"
+                    )
                     pbar.update(1)
 
 
@@ -660,7 +668,9 @@ def generate_opcodes_codenet(force: bool = False) -> pd.DataFrame:
                     )
                     traceback.print_exc()
                 else:
-                    pbar.set_description(f"[Generate Opcodes] Processing {problem_id} {original_id}")
+                    pbar.set_description(
+                        f"[Generate Opcodes] Processing {problem_id} {original_id}"
+                    )
                     pbar.update(1)
 
     pd.concat(opcodes_dfs).to_csv(generated_opcodes_path, index=False)
@@ -719,7 +729,7 @@ def add_error_description_task(
 
 def add_error_description_codenet(force: bool = False) -> pd.DataFrame:
     if os.path.exists(error_pairs_path) and not force:
-        print("Opcodes already generated. skiping...")
+        print("Error Descriptions already generated. skiping...")
         return
 
     generated_pairs_df = pd.read_csv(generated_pairs_path)
@@ -768,7 +778,9 @@ def add_error_description_codenet(force: bool = False) -> pd.DataFrame:
                     )
                     traceback.print_exc()
                 else:
-                    pbar.set_description(f"[Generate Error] Processing {problem_id} {original_id}")
+                    pbar.set_description(
+                        f"[Generate Error] Processing {problem_id} {original_id}"
+                    )
                     pbar.update(1)
 
     errs_df = pd.DataFrame(
@@ -790,32 +802,183 @@ def add_error_description_codenet(force: bool = False) -> pd.DataFrame:
     df.to_csv(error_pairs_path, index=False)
 
 
-def generate_treesitter_Xy(force: bool = True) -> pd.DataFrame:
-    if os.path.exists(treesitter_Xy_path) and not force:
-        print("Tree Sitter Xy already generated. skiping...")
+def parse_treesitter(source_code: str, language: str) -> Tree:
+    parser = Parser()
+
+    if language == "Python":
+        parser.set_language(PY_LANGUAGE)
+        return parser.parse(bytes(source_code, "utf8"))
+
+    assert False, f"Parser for {language} not implemented yet"
+
+
+def iter_tree(tree: Tree):
+    cursor = tree.walk()
+
+    reached_root = False
+    while reached_root == False:
+        yield cursor.node
+
+        if cursor.goto_first_child():
+            continue
+
+        if cursor.goto_next_sibling():
+            continue
+
+        retracing = True
+        while retracing:
+            if not cursor.goto_parent():
+                retracing = False
+                reached_root = True
+
+            if cursor.goto_next_sibling():
+                retracing = False
+
+
+def generate_tokens_tree(tree: Tree, linecolumn_error: list[list[int]]):
+    tokens = []
+
+    for node in iter_tree(tree):
+        line_start = node.start_point[0] + 1
+        line_end = node.end_point[0] + 1
+        column_start = node.start_point[1]
+        column_end = node.end_point[1]
+
+
+        is_error = 0
+        for [l, c] in linecolumn_error:
+            if line_start <= l and l <= line_end and column_start <= c and c <= column_end:
+                is_error = 1
+                break
+
+        tokens.append(
+            {
+                "type": node.type,
+                "line_start": node.start_point[0],
+                "line_end": node.end_point[0],
+                "column_start": node.start_point[1],
+                "column_end": node.end_point[1],
+                "text": node.text.decode(),
+                "is_leaf": int(len(node.children) == 0),
+                "is_error": is_error,
+            }
+        )
+
+    return pd.DataFrame(tokens)
+
+
+def label_tokens(tokens: pd.Series, label_ranges: list[list[int]]) -> np.ndarray:
+    labels = np.zeros_like(tokens)
+    for [i1, i2] in label_ranges:
+        labels[i1: max(i1+1, i2)] = 1
+
+    return labels
+
+
+def get_linecolumn_error(opcodes_df: pd.DataFrame, source_df: pd.DataFrame) -> list[list[int]]:
+    label_ranges = opcodes_df[['i1', 'i2']].values.tolist()
+    tokens = source_df['text']
+
+    labels = label_tokens(tokens, label_ranges)
+    return source_df[['line', 'column']].values[labels == 1].tolist()
+
+
+def generate_treesitter_Xy_task(
+    problem_id: str,
+    original_id: str,
+    changed_id: str,
+    language: str,
+    filename_ext: str,
+    opcodes_df: pd.DataFrame,
+):
+    csv_path = id2submission(
+        problem_id, language, original_id, "csv", generated_data_path
+    )
+    original_df = pd.read_csv(csv_path, keep_default_na=False)
+    original_src = "".join(
+        read_submission_file(problem_id, language, original_id, filename_ext)
+    )
+
+    csv_path = id2submission(
+        problem_id, language, changed_id, "csv", generated_data_path
+    )
+    changed_df = pd.read_csv(csv_path, keep_default_na=False)
+    changed_src = "".join(
+        read_submission_file(problem_id, language, changed_id, filename_ext)
+    )
+
+    original_tree = parse_treesitter(original_src, language)
+    changed_tree = parse_treesitter(changed_src, language)
+
+    linecolumn_error = get_linecolumn_error(opcodes_df, original_df)
+    original_tree_df = generate_tokens_tree(original_tree, linecolumn_error)
+    changed_tree_df = generate_tokens_tree(original_tree, [])
+
+    return original_tree_df, changed_tree_df
+
+
+def generate_treesitter_Xy(force: bool = False):
+    if os.path.exists(generated_treedata_path) and not force:
+        print("TreeSitter already generated. skiping...")
         return
 
-    problem_list_df = pd.read_csv(problem_list_clean_path, index_col="id")
-    generated_pairs_df = pd.read_csv(generated_pairs_path)
-    error_pairs_df = pd.read_csv(error_pairs_path)
+    parser = Parser()
+    parser.set_language(PY_LANGUAGE)
 
-    # TODO 1: group the submissions by error_pairs_df
+    df = pd.read_csv(error_pairs_path)
+    gs = df.groupby(
+        ["problem_id", "original_id", "changed_id", "language", "filename_ext"]
+    ).groups
 
-    # TODO 2: For each pair read the source code and the tokens
+    with tqdm(total=len(gs)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(
+                    generate_treesitter_Xy_task,
+                    *key,
+                    df.iloc[_ids][["tag", "i1", "i2", "j1", "j2"]],
+                ): key
+                for key, _ids in gs.items()
+            }
 
-    # TODO 3: Tree Sitter the source code
-
-    # TODO 4: Walk the tree and for each node check the position (line and column)
-    # Label that node with the label corresponding to the token at the same position
-
-    # TODO 5: Save the information for each problem similar to the tokens in csv files
-    # Columns: Token, Label
-
-    return pd.DataFrame()
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                (
+                    problem_id,
+                    original_id,
+                    changed_id,
+                    language,
+                    filename_ext,
+                ) = future_to_problem_id[future]
+                try:
+                    original_tree_df, changed_tree_df = future.result()
+                    original_tree_path = id2submission(
+                        problem_id, language, original_id, "csv", generated_treedata_path
+                    )
+                    changed_tree_path = id2submission(
+                        problem_id, language, changed_id, "csv", generated_treedata_path
+                    )
+                    os.makedirs(os.path.dirname(original_tree_path), exist_ok=True)
+                    original_tree_df.to_csv(original_tree_path, index=False)
+                    os.makedirs(os.path.dirname(changed_tree_path), exist_ok=True)
+                    changed_tree_df.to_csv(changed_tree_path, index=False)
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(
+                        f"[Generate TreeSitter] Processing {problem_id} {original_id}"
+                    )
+                    pbar.update(1)
 
 
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(generated_path), exist_ok=True)
+
+    Language.build_library(build_languages_path, [vendor_python_treesitter_path])
+
+    PY_LANGUAGE = Language(build_languages_path, "python")
 
     download_codenet()
     clean_codenet()
@@ -823,3 +986,4 @@ if __name__ == "__main__":
     tokenize_pairs_codenet()
     generate_opcodes_codenet()
     add_error_description_codenet()
+    generate_treesitter_Xy()
