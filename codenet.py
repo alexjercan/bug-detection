@@ -1,3 +1,4 @@
+import gc
 import os
 import re
 import io
@@ -803,11 +804,9 @@ def add_error_description_codenet(force: bool = False) -> pd.DataFrame:
 
 
 def parse_treesitter(source_code: str, language: str) -> Tree:
-    parser = Parser()
 
     if language == "Python":
-        parser.set_language(PY_LANGUAGE)
-        return parser.parse(bytes(source_code, "utf8"))
+        return PY_PARSER.parse(bytes(source_code, "utf8"))
 
     assert False, f"Parser for {language} not implemented yet"
 
@@ -916,20 +915,49 @@ def generate_treesitter_Xy_task(
 
     return original_tree_df, changed_tree_df
 
-
 def generate_treesitter_Xy(force: bool = False):
     if os.path.exists(generated_treedata_path) and not force:
         print("TreeSitter already generated. skiping...")
         return
-
-    parser = Parser()
-    parser.set_language(PY_LANGUAGE)
 
     df = pd.read_csv(error_pairs_path)
     gs = df.groupby(
         ["problem_id", "original_id", "changed_id", "language", "filename_ext"]
     ).groups
 
+    with tqdm(total=len(gs)) as pbar:
+        for key, _ids in gs.items():
+            (
+                problem_id,
+                original_id,
+                changed_id,
+                language,
+                filename_ext,
+            ) = key
+            try:
+                original_tree_df, changed_tree_df = generate_treesitter_Xy_task(*key, df.iloc[_ids][["tag", "i1", "i2", "j1", "j2"]])
+                original_tree_path = id2submission(
+                    problem_id, language, original_id, "csv", generated_treedata_path
+                )
+                changed_tree_path = id2submission(
+                    problem_id, language, changed_id, "csv", generated_treedata_path
+                )
+                os.makedirs(os.path.dirname(original_tree_path), exist_ok=True)
+                original_tree_df.to_csv(original_tree_path, index=False)
+                os.makedirs(os.path.dirname(changed_tree_path), exist_ok=True)
+                changed_tree_df.to_csv(changed_tree_path, index=False)
+            except Exception as exc:
+                print(
+                    f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                )
+                traceback.print_exc()
+            else:
+                pbar.set_description(
+                    f"[Generate TreeSitter] Processing {problem_id} {original_id}"
+                )
+            pbar.update(1)
+
+    """
     with tqdm(total=len(gs)) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
             future_to_problem_id = {
@@ -971,6 +999,7 @@ def generate_treesitter_Xy(force: bool = False):
                         f"[Generate TreeSitter] Processing {problem_id} {original_id}"
                     )
                     pbar.update(1)
+    """
 
 
 if __name__ == "__main__":
@@ -979,6 +1008,8 @@ if __name__ == "__main__":
     Language.build_library(build_languages_path, [vendor_python_treesitter_path])
 
     PY_LANGUAGE = Language(build_languages_path, "python")
+    PY_PARSER = Parser()
+    PY_PARSER.set_language(PY_LANGUAGE)
 
     download_codenet()
     clean_codenet()
