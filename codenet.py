@@ -8,13 +8,10 @@ import traceback
 import subprocess
 import concurrent.futures
 
-import numpy as np
 import pandas as pd
 
 from tqdm import tqdm
 from typing import Union
-from difflib import SequenceMatcher
-from tree_sitter import Language, Parser, Tree
 
 tqdm.pandas()
 
@@ -33,7 +30,7 @@ descriptions_path = root_path + "problem_descriptions/"
 problem_list_clean_path = generated_path + "problem_list_clean.csv"
 generated_pairs_path = generated_path + "generated_pairs.csv"
 error_pairs_path = generated_path + "error_pairs.csv"
-generated_labels_path = generated_path + "generated_labels.json"
+codenetpy_path = generated_path + "codenetpy.json"
 
 supported_languages = ["Python"]
 supported_original_languages = [
@@ -75,44 +72,6 @@ supported_original_languages = [
 data_url = "https://dax-cdn.cdn.appdomain.cloud/dax-project-codenet/1.0.0"
 tar_name = "Project_CodeNet.tar.gz"
 tar_path = input_path + tar_name
-
-vendor_python_treesitter_path = "../vendor/tree-sitter-python"
-build_languages_path = "../build/my-languages.so"
-
-
-def parse_treesitter(source_code: str, language: str) -> Tree:
-
-    if language == "Python":
-        return PY_PARSER.parse(bytes(source_code, "utf8"))
-
-    assert False, f"Parser for {language} not implemented yet"
-
-
-def iter_tree(tree: Tree):
-    cursor = tree.walk()
-
-    reached_root = False
-    while reached_root == False:
-        yield cursor.node
-
-        if cursor.goto_first_child():
-            continue
-
-        if cursor.goto_next_sibling():
-            continue
-
-        retracing = True
-        while retracing:
-            if not cursor.goto_parent():
-                retracing = False
-                reached_root = True
-
-            if cursor.goto_next_sibling():
-                retracing = False
-
-
-def generate_tokens_tree(tree: Tree):
-    return [node.text.decode() for node in iter_tree(tree) if not node.children and not node.type == "comment"]
 
 
 def handle_process(
@@ -244,11 +203,15 @@ def extract_error_class_extra(row: pd.Series) -> str:
     return ""
 
 
-def exec_file_python(file_path: str, input: str = None, timeout: float = 2.0) -> tuple[str, str, int]:
+def exec_file_python(
+    file_path: str, input: str = None, timeout: float = 2.0
+) -> tuple[str, str, int]:
     return handle_process(["python3", file_path], input, timeout)
 
 
-def exec_file(file_path: str, input: str = None, timeout: float = 2.0, language: str = None) -> tuple[str, str, int]:
+def exec_file(
+    file_path: str, input: str = None, timeout: float = 2.0, language: str = None
+) -> tuple[str, str, int]:
     if language == "Python":
         return exec_file_python(file_path, input, timeout)
     raise NotImplementedError
@@ -453,7 +416,9 @@ def generate_error_description_task(
     timeout = time_limit / 1000 * 1.5
 
     try:
-        output, error, returncode = exec_file(source_code_path, input, timeout, language)
+        output, error, returncode = exec_file(
+            source_code_path, input, timeout, language
+        )
     except (AssertionError, DeprecationWarning) as exc:
         output = ""
         returncode = 1
@@ -539,31 +504,16 @@ def generate_labels_task(
     error: str,
     output: str,
 ) -> dict:
-    original_src = "".join(read_submission_file(problem_id, language, original_id, filename_ext))
-    changed_src = "".join(read_submission_file(problem_id, language, changed_id, filename_ext))
-
-    original_tree = parse_treesitter(original_src, language)
-    changed_tree = parse_treesitter(changed_src, language)
-
-    original_tokens = generate_tokens_tree(original_tree)
-    changed_tokens = generate_tokens_tree(changed_tree)
-
-    s: SequenceMatcher = SequenceMatcher(None, original_tokens, changed_tokens)
-    opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
-
-    original_labels = np.zeros_like(original_tokens, dtype=np.int32)
-    changed_labels = np.zeros_like(changed_tokens, dtype=np.int32)
-    for _, i1, i2, j1, j2 in opcodes:
-        original_labels[i1: max(i1+1, i2)] = 1
-        changed_labels[j1: max(j1+1, j2)] = 1
-    original_labels = original_labels.tolist()
-    changed_labels = changed_labels.tolist()
+    original_src = "".join(
+        read_submission_file(problem_id, language, original_id, filename_ext)
+    )
+    changed_src = "".join(
+        read_submission_file(problem_id, language, changed_id, filename_ext)
+    )
 
     return {
-        "original_tokens": original_tokens,
-        "original_labels": original_labels,
-        "changed_tokens": changed_tokens,
-        "changed_labels": changed_labels,
+        "original_src": original_src,
+        "changed_src": changed_src,
         "problem_id": problem_id,
         "original_id": original_id,
         "changed_id": changed_id,
@@ -579,7 +529,7 @@ def generate_labels_task(
 
 
 def generate_labels_codenet(force: bool = False):
-    if os.path.exists(generated_labels_path) and not force:
+    if os.path.exists(codenetpy_path) and not force:
         print("Labels already generated. skiping...")
         return
 
@@ -589,10 +539,16 @@ def generate_labels_codenet(force: bool = False):
     with tqdm(total=len(errs_df)) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
             future_to_problem_id = {
-                executor.submit(
-                    generate_labels_task,
-                    *row,
-                ): row[['original_id', 'changed_id', 'original_status', 'problem_id', 'language', 'filename_ext']]
+                executor.submit(generate_labels_task, *row,): row[
+                    [
+                        "original_id",
+                        "changed_id",
+                        "original_status",
+                        "problem_id",
+                        "language",
+                        "filename_ext",
+                    ]
+                ]
                 for _, row in errs_df.iterrows()
             }
 
@@ -619,21 +575,15 @@ def generate_labels_codenet(force: bool = False):
                     )
                     pbar.update(1)
 
-    with open(generated_labels_path, 'w') as f:
+    with open(codenetpy_path, "w") as f:
         json.dump(labels, f)
 
 
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(generated_path), exist_ok=True)
 
-    Language.build_library(build_languages_path, [vendor_python_treesitter_path])
-
-    PY_LANGUAGE = Language(build_languages_path, "python")
-    PY_PARSER = Parser()
-    PY_PARSER.set_language(PY_LANGUAGE)
-
     download_codenet()
     clean_codenet()
     generate_pairs_codenet()
     generate_error_description_codenet()
-    generate_labels_codenet()
+    generate_labels_codenet(force=True)
