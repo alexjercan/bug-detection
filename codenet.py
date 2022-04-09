@@ -616,4 +616,4 @@ if __name__ == "__main__":
     generate_pairs_codenet()
     generate_error_description_codenet()
     generate_labels_codenet()
-    generate_train_test_splits(force=True)
+    generate_train_test_splits()
