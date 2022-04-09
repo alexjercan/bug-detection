@@ -17,7 +17,7 @@ tqdm.pandas()
 
 P = 8
 
-input_path = "../../input/"
+input_path = "../input/"
 root_path = input_path + "Project_CodeNet/"
 generated_path = input_path + "generated/"
 
@@ -601,8 +601,11 @@ def generate_train_test_splits(force: bool = False):
         len(labels_df_grouped) - int(len(labels_df_grouped) * 0.8)
     )
 
-    train_df.to_json(codenetpy_train_path, orient="records")
-    test_df.to_json(codenetpy_test_path, orient="records")
+    with open(codenetpy_train_path, "w") as f:
+        json.dump({"data": train_df.to_dict(orient="records")}, f)
+
+    with open(codenetpy_test_path, "w") as f:
+        json.dump({"data": test_df.to_dict(orient="records")}, f)
 
 
 if __name__ == "__main__":
@@ -613,4 +616,4 @@ if __name__ == "__main__":
     generate_pairs_codenet()
     generate_error_description_codenet()
     generate_labels_codenet()
-    generate_train_test_splits()
+    generate_train_test_splits(force=True)
