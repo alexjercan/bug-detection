@@ -595,11 +595,9 @@ def generate_train_test_splits(force: bool = False):
 
     labels_df = pd.DataFrame(labels)
     labels_df.sort_values(by=["problem_id"], inplace=True)
-    labels_df_grouped = labels_df.groupby("problem_id")
-    train_df = labels_df_grouped.head(int(len(labels_df_grouped) * 0.8))
-    test_df = labels_df_grouped.tail(
-        len(labels_df_grouped) - int(len(labels_df_grouped) * 0.8)
-    )
+
+    train_df = labels_df.head(int(len(labels) * 0.8))
+    test_df = labels_df.tail(len(labels_df) - int(len(labels_df) * 0.8))
 
     with open(codenetpy_train_path, "w") as f:
         json.dump({"data": train_df.to_dict(orient="records")}, f)
