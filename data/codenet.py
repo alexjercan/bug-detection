@@ -17,7 +17,7 @@ tqdm.pandas()
 
 P = 8
 
-input_path = "../input/"
+input_path = "../../input/"
 root_path = input_path + "Project_CodeNet/"
 generated_path = input_path + "generated/"
 
@@ -31,6 +31,8 @@ problem_list_clean_path = generated_path + "problem_list_clean.csv"
 generated_pairs_path = generated_path + "generated_pairs.csv"
 error_pairs_path = generated_path + "error_pairs.csv"
 codenetpy_path = generated_path + "codenetpy.json"
+codenetpy_train_path = generated_path + "codenetpy_train.json"
+codenetpy_test_path = generated_path + "codenetpy_test.json"
 
 supported_languages = ["Python"]
 supported_original_languages = [
@@ -579,6 +581,30 @@ def generate_labels_codenet(force: bool = False):
         json.dump(labels, f)
 
 
+def generate_train_test_splits(force: bool = False):
+    if (
+        os.path.exists(codenetpy_train_path)
+        and os.path.exists(codenetpy_test_path)
+        and not force
+    ):
+        print("Train and Test splits already generated. skiping...")
+        return
+
+    with open(codenetpy_path, "r") as f:
+        labels = json.load(f)
+
+    labels_df = pd.DataFrame(labels)
+    labels_df.sort_values(by=["problem_id"], inplace=True)
+    labels_df_grouped = labels_df.groupby("problem_id")
+    train_df = labels_df_grouped.head(int(len(labels_df_grouped) * 0.8))
+    test_df = labels_df_grouped.tail(
+        len(labels_df_grouped) - int(len(labels_df_grouped) * 0.8)
+    )
+
+    train_df.to_json(codenetpy_train_path, orient="records")
+    test_df.to_json(codenetpy_test_path, orient="records")
+
+
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(generated_path), exist_ok=True)
 
@@ -586,4 +612,5 @@ if __name__ == "__main__":
     clean_codenet()
     generate_pairs_codenet()
     generate_error_description_codenet()
-    generate_labels_codenet(force=True)
+    generate_labels_codenet()
+    generate_train_test_splits()
