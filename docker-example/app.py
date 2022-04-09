@@ -32,8 +32,7 @@ def main():
 
     st.title("Buggy Source Code Detection")
 
-    default_code = """a = 1
-A = A + 5 * a
+    default_code = """A = map(input().split())
 print(A)"""
     code = st.text_area("Enter the code here:", default_code)
 

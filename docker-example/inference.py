@@ -107,10 +107,8 @@ if __name__ == "__main__":
         "alexjercan/codebert-base-buggy-token-classification"
     )
 
-    source_code = """a = 1
-A = A + 5 * a
-print(A)
-"""
+    source_code = """A = map(input().split())
+print(A)"""
 
     result = run(source_code, tokenizer_ed, model_ed, tokenizer_tc, model_tc)
 
