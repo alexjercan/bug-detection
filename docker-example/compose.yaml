@@ -1,0 +1,9 @@
+services:
+  streamlit:
+    image: bug-detection-v1
+    build:
+      context: .
+    ports:
+      - "8051:8051"
+
+
