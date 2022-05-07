@@ -1,5 +1,6 @@
 import numpy as np
 
+from difflib import SequenceMatcher
 from transformers import (
     RobertaTokenizerFast,
     T5ForConditionalGeneration,
@@ -7,8 +8,31 @@ from transformers import (
 )
 
 
-LIGHT_THEME = {"err_color": "red", "norm_color": "black", "ws_color": "lightgrey"}
-DARK_THEME = {"err_color": "red", "norm_color": "white", "ws_color": "grey"}
+LIGHT_THEME = {"norm_color": "black", "ws_color": "lightgrey"}
+DARK_THEME = {"norm_color": "white", "ws_color": "grey"}
+
+
+def prepare_model():
+    tokenizer_ed = RobertaTokenizerFast.from_pretrained(
+        "alexjercan/codet5-base-buggy-error-description"
+    )
+    model_ed = T5ForConditionalGeneration.from_pretrained(
+        "alexjercan/codet5-base-buggy-error-description"
+    )
+    tokenizer_tc = RobertaTokenizerFast.from_pretrained(
+        "alexjercan/codebert-base-buggy-token-classification"
+    )
+    model_tc = RobertaForTokenClassification.from_pretrained(
+        "alexjercan/codebert-base-buggy-token-classification"
+    )
+    tokenizer_cg = RobertaTokenizerFast.from_pretrained(
+        "alexjercan/codet5-base-buggy-code-repair"
+    )
+    model_cg = T5ForConditionalGeneration.from_pretrained(
+        "alexjercan/codet5-base-buggy-code-repair"
+    )
+
+    return tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg
 
 
 def predict_error_description(tokenizer, model, source):
@@ -50,15 +74,45 @@ def predict_token_class(tokenizer, model, error, source):
     return all_labels
 
 
-def predict(tokenizer_ed, model_ed, tokenizer_tc, model_tc, source):
+def predict_source_code(tokenizer, model, error, source):
+    tokenized_inputs = tokenizer(
+        text=error,
+        text_pair=source,
+        max_length=512,
+        padding=True,
+        truncation=True,
+        return_tensors="pt",
+    ).to(model.device)
+    tokenized_labels = (
+        model.generate(max_length=512, **tokenized_inputs).cpu().detach().numpy()
+    )
+
+    return tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
+
+
+def predict(
+    tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg, source
+):
     error = predict_error_description(tokenizer_ed, model_ed, source)
     labels = predict_token_class(tokenizer_tc, model_tc, error, source)
+    source_code = predict_source_code(tokenizer_cg, model_cg, error, source)
 
-    return error, labels
+    return error, labels, source_code
+
+
+def generate_char_mask(original_src, changed_src):
+    s = SequenceMatcher(None, original_src, changed_src)
+    opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
+
+    original_labels = np.zeros_like(list(original_src), dtype=np.int32)
+    for _, i1, i2, _, _ in opcodes:
+        original_labels[i1 : max(i1 + 1, i2)] = 1
+
+    return original_labels.tolist()
 
 
 def color_source(
-    source_code, mask, err_color="red", norm_color="black", ws_color="lightgrey"
+    source_code, mask, accent_color="red", norm_color="black", ws_color="lightgrey"
 ):
     text = ""
     for i, char in enumerate(source_code):
@@ -69,47 +123,32 @@ def color_source(
         if char == "\n":
             char = "↵\n"
             color = ws_color
-        text += (
-            f'<span style="color:{err_color if mask[i] == 1 else color};">{char}</span>'
-        )
+        text += f'<span style="color:{accent_color if mask[i] == 1 else color};">{char}</span>'
     return "<pre>" + text + "</pre>"
 
 
-def run(source_code, tokenizer_ed, model_ed, tokenizer_tc, model_tc, theme=LIGHT_THEME):
+def run(source_code, tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg, theme=LIGHT_THEME):
     if isinstance(source_code, str):
         source_code = [source_code]
 
-    error, labels = predict(tokenizer_ed, model_ed, tokenizer_tc, model_tc, source_code)
+    error, labels, new_source_code = predict(
+        tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg, source_code
+    )
     source_code_html = [
         color_source(src, labels[i], **theme) for i, src in enumerate(source_code)
     ]
     error_html = [f"<pre>{err}</pre>" for err in error]
+    new_source_code_html = [
+        color_source(
+            new_src, generate_char_mask(new_src, src), accent_color="green", **theme
+        )
+        for new_src, src in zip(new_source_code, source_code)
+    ]
 
     result = []
-    for src, err in zip(source_code_html, error_html):
-        result.append(f"<h1>Source code</h1>{src}<h1>Error description</h1>{err}")
+    for src, err, new_src in zip(source_code_html, error_html, new_source_code_html):
+        result.append(
+            f"<h1>Source code</h1>{src}<h1>Error description</h1>{err}<h1>Repaired code</h1>{new_src}"
+        )
 
     return result
-
-
-if __name__ == "__main__":
-    tokenizer_ed = RobertaTokenizerFast.from_pretrained(
-        "alexjercan/codet5-base-buggy-error-description"
-    )
-    model_ed = T5ForConditionalGeneration.from_pretrained(
-        "alexjercan/codet5-base-buggy-error-description"
-    )
-
-    tokenizer_tc = RobertaTokenizerFast.from_pretrained(
-        "alexjercan/codebert-base-buggy-token-classification"
-    )
-    model_tc = RobertaForTokenClassification.from_pretrained(
-        "alexjercan/codebert-base-buggy-token-classification"
-    )
-
-    source_code = """A = map(input().split())
-print(A)"""
-
-    result = run(source_code, tokenizer_ed, model_ed, tokenizer_tc, model_tc)
-
-    print("\n".join(result))
