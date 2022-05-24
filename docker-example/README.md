@@ -2,6 +2,8 @@
 
 Docker image using streamlit to test the bug detection pipeline.
 
+![thumbnail](./resources/streamlit_example.png)
+
 ## Quickstart
 
 ### Docker Compose
