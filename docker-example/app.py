@@ -22,7 +22,7 @@ def main():
     st.title("Buggy Source Code Detection")
 
     default_code = """A = map(input().split())
-print(A)"""
+print(A[0])"""
     code = st.text_area("Enter the code here:", default_code)
 
     if st.button("Run"):
