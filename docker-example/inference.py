@@ -11,6 +11,8 @@ from transformers import (
 LIGHT_THEME = {"norm_color": "black", "ws_color": "lightgrey"}
 DARK_THEME = {"norm_color": "white", "ws_color": "grey"}
 
+BEAM_SIZE = 5
+
 
 def prepare_model():
     tokenizer_ed = RobertaTokenizerFast.from_pretrained(
@@ -35,20 +37,28 @@ def prepare_model():
     return tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg
 
 
-def predict_error_description(tokenizer, model, source):
+def predict_error_description(
+    tokenizer, model, source: list, beam_size=BEAM_SIZE
+) -> list:
     tokenized_inputs = tokenizer(
         source, padding=True, truncation=True, return_tensors="pt"
     ).to(model.device)
-    tokenized_labels = model.generate(**tokenized_inputs).cpu().detach().numpy()
+    tokenized_labels = (
+        model.generate(
+            num_beams=beam_size,
+            no_repeat_ngram_size=2,
+            num_return_sequences=beam_size,
+            **tokenized_inputs,
+        )
+        .cpu()
+        .detach()
+        .numpy()
+    )
 
     return tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
 
 
-def predict_token_class(tokenizer, model, error, source):
-    if not isinstance(source, list):
-        source = [source]
-        error = [error]
-
+def predict_token_class(tokenizer, model, error: list, source: list) -> list:
     tokenized_inputs = tokenizer(
         text=error, text_pair=source, padding=True, truncation=True, return_tensors="pt"
     ).to(model.device)
@@ -74,7 +84,9 @@ def predict_token_class(tokenizer, model, error, source):
     return all_labels
 
 
-def predict_source_code(tokenizer, model, error, source):
+def predict_source_code(
+    tokenizer, model, error: list, source: list, beam_size=BEAM_SIZE
+) -> list:
     tokenized_inputs = tokenizer(
         text=error,
         text_pair=source,
@@ -84,23 +96,41 @@ def predict_source_code(tokenizer, model, error, source):
         return_tensors="pt",
     ).to(model.device)
     tokenized_labels = (
-        model.generate(max_length=512, **tokenized_inputs).cpu().detach().numpy()
+        model.generate(
+            num_beams=beam_size,
+            no_repeat_ngram_size=2,
+            num_return_sequences=beam_size,
+            max_length=512,
+            **tokenized_inputs,
+        )
+        .cpu()
+        .detach()
+        .numpy()
     )
 
     return tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
 
 
 def predict(
-    tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg, source
-):
-    error = predict_error_description(tokenizer_ed, model_ed, source)
+    tokenizer_ed,
+    model_ed,
+    tokenizer_tc,
+    model_tc,
+    tokenizer_cg,
+    model_cg,
+    source: list[str],
+    beam_size=BEAM_SIZE,
+) -> (list, list, list):
+    error = predict_error_description(tokenizer_ed, model_ed, source, beam_size)
+    source = [src for src in source for _ in range(beam_size)]
+
     labels = predict_token_class(tokenizer_tc, model_tc, error, source)
-    source_code = predict_source_code(tokenizer_cg, model_cg, error, source)
+    source_code = predict_source_code(tokenizer_cg, model_cg, error, source, beam_size)
 
     return error, labels, source_code
 
 
-def generate_char_mask(original_src, changed_src):
+def generate_char_mask(original_src: str, changed_src: str) -> list:
     s = SequenceMatcher(None, original_src, changed_src)
     opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
 
@@ -112,8 +142,12 @@ def generate_char_mask(original_src, changed_src):
 
 
 def color_source(
-    source_code, mask, accent_color="red", norm_color="black", ws_color="lightgrey"
-):
+    source_code: str,
+    mask: list,
+    accent_color="red",
+    norm_color="black",
+    ws_color="lightgrey",
+) -> str:
     text = ""
     for i, char in enumerate(source_code):
         color = norm_color
@@ -127,17 +161,39 @@ def color_source(
     return "<pre>" + text + "</pre>"
 
 
-def run(source_code, tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg, theme=LIGHT_THEME):
+def run(
+    source_code,
+    tokenizer_ed,
+    model_ed,
+    tokenizer_tc,
+    model_tc,
+    tokenizer_cg,
+    model_cg,
+    theme=LIGHT_THEME,
+    beam_size=BEAM_SIZE,
+):
     if isinstance(source_code, str):
         source_code = [source_code]
 
     error, labels, new_source_code = predict(
-        tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg, source_code
+        tokenizer_ed,
+        model_ed,
+        tokenizer_tc,
+        model_tc,
+        tokenizer_cg,
+        model_cg,
+        source_code,
+        beam_size=beam_size,
     )
+    source_code = [src for src in source_code for _ in range(beam_size)]
     source_code_html = [
-        color_source(src, labels[i], **theme) for i, src in enumerate(source_code)
+        color_source(src, labels[i], **theme)
+        for i, src in enumerate(source_code)
+        for _ in range(beam_size)
     ]
-    error_html = [f"<pre>{err}</pre>" for err in error]
+    error_html = [f"<pre>{err}</pre>" for err in error for _ in range(beam_size)]
+
+    source_code = [src for src in source_code for _ in range(beam_size)]
     new_source_code_html = [
         color_source(
             new_src, generate_char_mask(new_src, src), accent_color="green", **theme
