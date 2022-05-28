@@ -7,6 +7,8 @@ from transformers import (
     RobertaForTokenClassification,
 )
 
+from typing import List, Union, Tuple
+
 
 LIGHT_THEME = {"norm_color": "black", "ws_color": "lightgrey"}
 DARK_THEME = {"norm_color": "white", "ws_color": "grey"}
@@ -14,7 +16,7 @@ DARK_THEME = {"norm_color": "white", "ws_color": "grey"}
 BEAM_SIZE = 5
 
 
-def prepare_model():
+def prepare_model() -> Tuple[RobertaTokenizerFast, T5ForConditionalGeneration, RobertaTokenizerFast, RobertaForTokenClassification, RobertaTokenizerFast, T5ForConditionalGeneration]:
     tokenizer_ed = RobertaTokenizerFast.from_pretrained(
         "alexjercan/codet5-base-buggy-error-description"
     )
@@ -38,8 +40,8 @@ def prepare_model():
 
 
 def predict_error_description(
-    tokenizer, model, source: list, beam_size=BEAM_SIZE
-) -> list:
+        tokenizer: RobertaTokenizerFast, model: T5ForConditionalGeneration, source: List[str], beam_size=BEAM_SIZE
+) -> List[str]:
     tokenized_inputs = tokenizer(
         source, padding=True, truncation=True, return_tensors="pt"
     ).to(model.device)
@@ -58,7 +60,9 @@ def predict_error_description(
     return tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
 
 
-def predict_token_class(tokenizer, model, error: list, source: list) -> list:
+def predict_token_class(
+        tokenizer: RobertaTokenizerFast, model: RobertaForTokenClassification, error: List[str], source: List[str]
+) -> List[List[int]]:
     tokenized_inputs = tokenizer(
         text=error, text_pair=source, padding=True, truncation=True, return_tensors="pt"
     ).to(model.device)
@@ -85,8 +89,8 @@ def predict_token_class(tokenizer, model, error: list, source: list) -> list:
 
 
 def predict_source_code(
-    tokenizer, model, error: list, source: list, beam_size=BEAM_SIZE
-) -> list:
+        tokenizer: RobertaTokenizerFast, model: T5ForConditionalGeneration, error: List[str], source: List[str], beam_size=BEAM_SIZE
+) -> List[str]:
     tokenized_inputs = tokenizer(
         text=error,
         text_pair=source,
@@ -112,15 +116,15 @@ def predict_source_code(
 
 
 def predict(
-    tokenizer_ed,
-    model_ed,
-    tokenizer_tc,
-    model_tc,
-    tokenizer_cg,
-    model_cg,
-    source: list[str],
+        tokenizer_ed: RobertaTokenizerFast,
+        model_ed: T5ForConditionalGeneration,
+        tokenizer_tc: RobertaTokenizerFast,
+        model_tc: RobertaForTokenClassification,
+        tokenizer_cg: RobertaTokenizerFast,
+        model_cg: T5ForConditionalGeneration,
+    source: List[str],
     beam_size=BEAM_SIZE,
-) -> (list, list, list):
+) -> Tuple[List[str], List[List[int]], List[str]]:
     error = predict_error_description(tokenizer_ed, model_ed, source, beam_size)
     source = [src for src in source for _ in range(beam_size)]
 
@@ -130,7 +134,7 @@ def predict(
     return error, labels, source_code
 
 
-def generate_char_mask(original_src: str, changed_src: str) -> list:
+def generate_char_mask(original_src: str, changed_src: str) -> List[int]:
     s = SequenceMatcher(None, original_src, changed_src)
     opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
 
@@ -143,7 +147,7 @@ def generate_char_mask(original_src: str, changed_src: str) -> list:
 
 def color_source(
     source_code: str,
-    mask: list,
+    mask: List[int],
     accent_color="red",
     norm_color="black",
     ws_color="lightgrey",
@@ -162,13 +166,13 @@ def color_source(
 
 
 def run(
-    source_code,
-    tokenizer_ed,
-    model_ed,
-    tokenizer_tc,
-    model_tc,
-    tokenizer_cg,
-    model_cg,
+    source_code: Union[str, List[str]],
+    tokenizer_ed: RobertaTokenizerFast,
+    model_ed: T5ForConditionalGeneration,
+    tokenizer_tc: RobertaTokenizerFast,
+    model_tc: RobertaForTokenClassification,
+    tokenizer_cg: RobertaTokenizerFast,
+    model_cg: T5ForConditionalGeneration,
     theme=LIGHT_THEME,
     beam_size=BEAM_SIZE,
 ):
