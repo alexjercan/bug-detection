@@ -11,11 +11,12 @@ def home():
 def inference():
     data = request.get_json()
     source_code = data["source_code"]
+    beam_size = data.get("beam_size", 1)
 
     print(data)
     print(source_code)
 
-    error_description, token_class, source_code = ses.run(source_code)
+    error_description, token_class, source_code = ses.run(source_code, beam_size)
 
     return jsonify(
         {
