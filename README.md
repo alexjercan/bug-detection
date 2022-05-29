@@ -13,7 +13,8 @@ application. We have used Flask and gunicorn for deployment inside Docker.
 
 The generated dataset and the notebooks used to train the model can be found on
 Kaggle. Dataset can be found
-[here](https://www.kaggle.com/datasets/alexjercan/codenetpy)
+[here](https://www.kaggle.com/datasets/alexjercan/codenetpy). Trained models
+can be found [here](https://huggingface.co/alexjercan).
 
 ## About the Dataset
 
