@@ -1,5 +1,26 @@
 # Bug Detection and Repair
 
+## Quickstart
+
+1. Download the CodeNet dataset and generate CodeNetPy into
+   `../input/generated`
+
+```console
+python codenet.py
+```
+
+2. Run Jupyter to see notebook examples
+
+```console
+jupyter notebook
+```
+
+3. To run the streamlit demo see [docker-example](./docker-example)
+
+4. To run the REST API see [rest-api](./rest-api)
+
+## Description
+
 This repository contains the script used for dataset generation
 [codenet.py](codenet.py). We have also added some exploratory data analysis
 notebooks for the generated dataset. The `docker-example` folder contains the
