@@ -1,5 +1,8 @@
 # Bug Detection and Repair
 
+Bug Detection and Repair Dataset with Exploratory Data Analysis examples and
+demo applications for Bug Detection and Repair algorithm.
+
 ## Quickstart
 
 1. Download the CodeNet dataset and generate CodeNetPy into
@@ -19,7 +22,7 @@ jupyter notebook
 
 4. To run the REST API see [rest-api](./rest-api)
 
-## Description
+## Architecture
 
 This repository contains the script used for dataset generation
 [codenet.py](codenet.py). We have also added some exploratory data analysis
