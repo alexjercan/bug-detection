@@ -1,49 +1,30 @@
+import logging
+
 import numpy as np
 
-from difflib import SequenceMatcher
+from typing import Union, List
 from transformers import (
     RobertaTokenizerFast,
     T5ForConditionalGeneration,
     RobertaForTokenClassification,
 )
 
-from typing import List, Union, Tuple
-
-
-LIGHT_THEME = {"norm_color": "black", "ws_color": "lightgrey"}
-DARK_THEME = {"norm_color": "white", "ws_color": "grey"}
 
 BEAM_SIZE = 5
 
 
-def prepare_model() -> Tuple[RobertaTokenizerFast, T5ForConditionalGeneration, RobertaTokenizerFast, RobertaForTokenClassification, RobertaTokenizerFast, T5ForConditionalGeneration]:
-    tokenizer_ed = RobertaTokenizerFast.from_pretrained(
-        "alexjercan/codet5-base-buggy-error-description"
-    )
-    model_ed = T5ForConditionalGeneration.from_pretrained(
-        "alexjercan/codet5-base-buggy-error-description"
-    )
-    tokenizer_tc = RobertaTokenizerFast.from_pretrained(
-        "alexjercan/codebert-base-buggy-token-classification"
-    )
-    model_tc = RobertaForTokenClassification.from_pretrained(
-        "alexjercan/codebert-base-buggy-token-classification"
-    )
-    tokenizer_cg = RobertaTokenizerFast.from_pretrained(
-        "alexjercan/codet5-base-buggy-code-repair"
-    )
-    model_cg = T5ForConditionalGeneration.from_pretrained(
-        "alexjercan/codet5-base-buggy-code-repair"
-    )
-
-    return tokenizer_ed, model_ed, tokenizer_tc, model_tc, tokenizer_cg, model_cg
-
-
 def predict_error_description(
-        tokenizer: RobertaTokenizerFast, model: T5ForConditionalGeneration, source: List[str], beam_size=BEAM_SIZE
-) -> List[str]:
+    tokenizer: RobertaTokenizerFast,
+    model: T5ForConditionalGeneration,
+    source: List[str],
+    beam_size=BEAM_SIZE,
+) -> List[List[str]]:
     tokenized_inputs = tokenizer(
-        source, padding=True, truncation=True, return_tensors="pt"
+        source,
+        max_length=512,
+        padding=True,
+        truncation=True,
+        return_tensors="pt",
     ).to(model.device)
     tokenized_labels = (
         model.generate(
@@ -57,14 +38,29 @@ def predict_error_description(
         .numpy()
     )
 
-    return tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
+    errors = tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
+    errors = [errors[i : i + beam_size] for i in range(0, len(errors), beam_size)]
+    return errors
 
 
 def predict_token_class(
-        tokenizer: RobertaTokenizerFast, model: RobertaForTokenClassification, error: List[str], source: List[str]
+    tokenizer: RobertaTokenizerFast,
+    model: RobertaForTokenClassification,
+    error: List[str],
+    source: List[str],
 ) -> List[List[int]]:
+    if isinstance(source, str):
+        source = [source]
+    if isinstance(error, str):
+        error = [error]
+
     tokenized_inputs = tokenizer(
-        text=error, text_pair=source, padding=True, truncation=True, return_tensors="pt"
+        text=error,
+        text_pair=source,
+        max_length=512,
+        padding=True,
+        truncation=True,
+        return_tensors="pt",
     ).to(model.device)
     tokenized_labels = np.argmax(
         model(**tokenized_inputs)["logits"].cpu().detach().numpy(), 2
@@ -83,14 +79,18 @@ def predict_token_class(
                 continue
             labels[cs.start : cs.end] |= tokenized_labels[i, j]
 
-        all_labels.append(labels)
+        all_labels.append([int(l) for l in labels])
 
     return all_labels
 
 
 def predict_source_code(
-        tokenizer: RobertaTokenizerFast, model: T5ForConditionalGeneration, error: List[str], source: List[str], beam_size=BEAM_SIZE
-) -> List[str]:
+    tokenizer: RobertaTokenizerFast,
+    model: T5ForConditionalGeneration,
+    error: List[str],
+    source: List[str],
+    beam_size=BEAM_SIZE,
+) -> List[List[str]]:
     tokenized_inputs = tokenizer(
         text=error,
         text_pair=source,
@@ -112,103 +112,68 @@ def predict_source_code(
         .numpy()
     )
 
-    return tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
+    sources = tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
+    sources = [sources[i : i + beam_size] for i in range(0, len(sources), beam_size)]
+    return sources
 
 
-def predict(
-        tokenizer_ed: RobertaTokenizerFast,
-        model_ed: T5ForConditionalGeneration,
-        tokenizer_tc: RobertaTokenizerFast,
-        model_tc: RobertaForTokenClassification,
-        tokenizer_cg: RobertaTokenizerFast,
-        model_cg: T5ForConditionalGeneration,
-    source: List[str],
-    beam_size=BEAM_SIZE,
-) -> Tuple[List[str], List[List[int]], List[str]]:
-    error = predict_error_description(tokenizer_ed, model_ed, source, beam_size)
-    source = [src for src in source for _ in range(beam_size)]
-
-    labels = predict_token_class(tokenizer_tc, model_tc, error, source)
-    source_code = predict_source_code(tokenizer_cg, model_cg, error, source, beam_size)
-
-    return error, labels, source_code
-
-
-def generate_char_mask(original_src: str, changed_src: str) -> List[int]:
-    s = SequenceMatcher(None, original_src, changed_src)
-    opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
-
-    original_labels = np.zeros_like(list(original_src), dtype=np.int32)
-    for _, i1, i2, _, _ in opcodes:
-        original_labels[i1 : max(i1 + 1, i2)] = 1
-
-    return original_labels.tolist()
-
-
-def color_source(
-    source_code: str,
-    mask: List[int],
-    accent_color="red",
-    norm_color="black",
-    ws_color="lightgrey",
-) -> str:
-    text = ""
-    for i, char in enumerate(source_code):
-        color = norm_color
-        if char == " ":
-            char = "•"
-            color = ws_color
-        if char == "\n":
-            char = "↵\n"
-            color = ws_color
-        text += f'<span style="color:{accent_color if mask[i] == 1 else color};">{char}</span>'
-    return "<pre>" + text + "</pre>"
-
-
-def run(
-    source_code: Union[str, List[str]],
-    tokenizer_ed: RobertaTokenizerFast,
-    model_ed: T5ForConditionalGeneration,
-    tokenizer_tc: RobertaTokenizerFast,
-    model_tc: RobertaForTokenClassification,
-    tokenizer_cg: RobertaTokenizerFast,
-    model_cg: T5ForConditionalGeneration,
-    theme=LIGHT_THEME,
-    beam_size=BEAM_SIZE,
-):
-    if isinstance(source_code, str):
-        source_code = [source_code]
-
-    error, labels, new_source_code = predict(
-        tokenizer_ed,
-        model_ed,
-        tokenizer_tc,
-        model_tc,
-        tokenizer_cg,
-        model_cg,
-        source_code,
-        beam_size=beam_size,
-    )
-    source_code = [src for src in source_code for _ in range(beam_size)]
-    source_code_html = [
-        color_source(src, labels[i], **theme)
-        for i, src in enumerate(source_code)
-        for _ in range(beam_size)
-    ]
-    error_html = [f"<pre>{err}</pre>" for err in error for _ in range(beam_size)]
-
-    source_code = [src for src in source_code for _ in range(beam_size)]
-    new_source_code_html = [
-        color_source(
-            new_src, generate_char_mask(new_src, src), accent_color="green", **theme
+class Session:
+    def __init__(self):
+        self.tokenizer_ed = RobertaTokenizerFast.from_pretrained(
+            "alexjercan/codet5-base-buggy-error-description"
         )
-        for new_src, src in zip(new_source_code, source_code)
-    ]
-
-    result = []
-    for src, err, new_src in zip(source_code_html, error_html, new_source_code_html):
-        result.append(
-            f"<h1>Source code</h1>{src}<h1>Error description</h1>{err}<h1>Repaired code</h1>{new_src}"
+        self.model_ed = T5ForConditionalGeneration.from_pretrained(
+            "alexjercan/codet5-base-buggy-error-description"
+        )
+        self.tokenizer_tc = RobertaTokenizerFast.from_pretrained(
+            "alexjercan/codebert-base-buggy-token-classification"
+        )
+        self.model_tc = RobertaForTokenClassification.from_pretrained(
+            "alexjercan/codebert-base-buggy-token-classification"
+        )
+        self.tokenizer_cg = RobertaTokenizerFast.from_pretrained(
+            "alexjercan/codet5-base-buggy-code-repair"
+        )
+        self.model_cg = T5ForConditionalGeneration.from_pretrained(
+            "alexjercan/codet5-base-buggy-code-repair"
         )
 
-    return result
+    def run(
+        self,
+        source_code: Union[str, List[str]],
+        beam_size_ed=BEAM_SIZE,
+        beam_size_cg=BEAM_SIZE,
+    ):
+        if isinstance(source_code, str):
+            source_code = [source_code]
+
+        logging.info("Generating error description...")
+        error_descriptions = predict_error_description(
+            self.tokenizer_ed, self.model_ed, source_code, beam_size_ed
+        )
+
+        logging.info("Predicting token classes...")
+        token_classes = [[] for _ in source_code]
+        for error_description in zip(*error_descriptions):
+            token_class = predict_token_class(
+                self.tokenizer_tc, self.model_tc, error_description, source_code
+            )
+            for i, tc in enumerate(token_class):
+                token_classes[i].append(tc)
+
+        logging.info("Generating source code...")
+        new_sources = [[] for _ in source_code]
+        for error_description in zip(*error_descriptions):
+            new_source = predict_source_code(
+                self.tokenizer_cg,
+                self.model_cg,
+                error_description,
+                source_code,
+                beam_size_cg,
+            )
+            for i, ns in enumerate(new_source):
+                new_sources[i].append(ns)
+
+        logging.info("Done.")
+
+        return error_descriptions, token_classes, new_sources
