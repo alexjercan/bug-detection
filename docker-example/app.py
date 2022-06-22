@@ -8,6 +8,7 @@ from typing import List
 
 LIGHT_THEME = {"norm_color": "black", "ws_color": "lightgrey"}
 DARK_THEME = {"norm_color": "white", "ws_color": "grey"}
+THEME = DARK_THEME
 
 
 def generate_char_mask(original_src: str, changed_src: str) -> List[int]:
@@ -101,7 +102,7 @@ print(A[0])"""
             errors[0],
             labels[0],
             [src for srcs in new_source_code[0] for src in srcs],
-            theme=DARK_THEME,
+            theme=THEME,
             beam_size_ed=5,
             beam_size_cg=1,
         )
