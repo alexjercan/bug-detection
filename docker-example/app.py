@@ -46,33 +46,38 @@ def view(
     source_code: str,
     error: List[str],
     labels: List[List[int]],
-    new_source_code: List[str],
+    new_source_code: List[List[str]],
     theme=LIGHT_THEME,
     beam_size_ed=5,
-    beam_size_cg=1,
 ):
     source_code = [source_code for _ in range(beam_size_ed)]
     source_code_html = [
-        color_source(src, labels[i], **theme)
-        for i, src in enumerate(source_code)
-        for _ in range(beam_size_ed)
+        color_source(src, labels[i], **theme) for i, src in enumerate(source_code)
     ]
-    error_html = [f"<pre>{err}</pre>" for err in error for _ in range(beam_size_cg)]
+    error_html = [f"<pre>{err}</pre>" for err in error]
 
-    source_code = [src for src in source_code for _ in range(beam_size_cg)]
-    new_source_code_html = [
-        color_source(
-            new_src, generate_char_mask(new_src, src), accent_color="green", **theme
+    new_source_code_html = []
+    for i, new_srcs in enumerate(new_source_code):
+        new_source_code_html.append(
+            [
+                color_source(
+                    new_src,
+                    generate_char_mask(new_src, source_code[i]),
+                    accent_color="green",
+                    **theme,
+                )
+                for new_src in new_srcs
+            ]
         )
-        for new_src, src in zip(new_source_code, source_code)
-    ]
 
     results = []
-    for src, err, new_src in zip(source_code_html, error_html, new_source_code_html):
-        results.append(
-            f"<h1>Source code</h1>{src}<h1>Error description</h1>{err}<h1>Repaired code</h1>{new_src}"
+    for i, new_srcs in enumerate(new_source_code_html):
+        results.extend(
+            [
+                f"<h1>Source code</h1>{source_code_html[i]}<h1>Error description</h1>{error_html[i]}<h1>Repaired code</h1>{new_src}"
+                for new_src in new_srcs
+            ]
         )
-
     results = [result.replace("\n</span>", "</span><br>") for result in results]
     return results
 
@@ -101,10 +106,9 @@ print(A[0])"""
             code,
             errors[0],
             labels[0],
-            [src for srcs in new_source_code[0] for src in srcs],
+            new_source_code[0],
             theme=THEME,
             beam_size_ed=5,
-            beam_size_cg=1,
         )
         st.session_state["index"] = 0
         st.session_state["results"] = results

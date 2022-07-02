@@ -18,10 +18,10 @@ def prepare_model():
         "alexjercan/codebert-base-buggy-token-classification"
     )
     tokenizer_cg = RobertaTokenizerFast.from_pretrained(
-        "alexjercan/codet5-base-buggy-code-repair"
+        "alexjercan/codet5-base-masked-buggy-code-repair"
     )
     model_cg = T5ForConditionalGeneration.from_pretrained(
-        "alexjercan/codet5-base-buggy-code-repair"
+        "alexjercan/codet5-base-masked-buggy-code-repair"
     )
 
 
