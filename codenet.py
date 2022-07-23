@@ -2,6 +2,7 @@ import os
 import re
 import wget
 import json
+import shutil
 import tarfile
 import functools
 import traceback
@@ -12,6 +13,7 @@ import pandas as pd
 
 from tqdm import tqdm
 from typing import Union
+from zipfile import ZipFile
 
 tqdm.pandas()
 
@@ -33,6 +35,8 @@ error_pairs_path = generated_path + "error_pairs.csv"
 codenetpy_path = generated_path + "codenetpy.json"
 codenetpy_train_path = generated_path + "codenetpy_train.json"
 codenetpy_test_path = generated_path + "codenetpy_test.json"
+filter_problem_statements_path = generated_path + "problem_descriptions/"
+kaggle_zip_path = generated_path + "kaggle.zip"
 
 supported_languages = ["Python"]
 supported_original_languages = [
@@ -606,6 +610,41 @@ def generate_train_test_splits(force: bool = False):
         json.dump({"data": test_df.to_dict(orient="records")}, f)
 
 
+def filter_problem_statements(force: bool = False):
+    if os.path.exists(filter_problem_statements_path) and not force:
+        print("Problem Statements already filtered. skiping...")
+        return
+
+    os.makedirs(filter_problem_statements_path, exist_ok=True)
+
+    with open(codenetpy_path, "r") as f:
+        labels = json.load(f)
+
+    labels_df = pd.DataFrame(labels)
+    labels_df.sort_values(by=["problem_id"], inplace=True)
+
+    for problem_id in tqdm(labels_df["problem_id"]):
+        src = id2desc(problem_id)
+        dst = os.path.join(filter_problem_statements_path, os.path.basename(src))
+        with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+            fdst.write(fsrc.read())
+
+
+def prepare_kaggle():
+    with ZipFile(kaggle_zip_path, "w") as zip_obj:
+        zip_obj.write(codenetpy_train_path, os.path.basename(codenetpy_train_path))
+        zip_obj.write(codenetpy_test_path, os.path.basename(codenetpy_test_path))
+        for folder_path, _, filenames in os.walk(filter_problem_statements_path):
+            for filename in filenames:
+                filePath = os.path.join(folder_path, filename)
+                zip_obj.write(
+                    filePath,
+                    os.path.join(
+                        os.path.basename(os.path.normpath(folder_path)), filename
+                    ),
+                )
+
+
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(generated_path), exist_ok=True)
 
@@ -615,3 +654,5 @@ if __name__ == "__main__":
     generate_error_description_codenet()
     generate_labels_codenet()
     generate_train_test_splits()
+    filter_problem_statements()
+    prepare_kaggle()
