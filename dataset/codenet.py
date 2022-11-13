@@ -1,49 +1,68 @@
+import io
+import os
 import random
+import zipfile
+import urllib.request
 
 import numpy as np
 
 from transformers import PreTrainedTokenizerBase
 from datasets import load_dataset, DatasetDict
 from difflib import SequenceMatcher
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Callable
 
 
-def detection(
-    root: str, tokenizer: PreTrainedTokenizerBase, batch_size: int = 4
+CODENETPY_URL = (
+    "https://github.com/alexjercan/bug-detection/releases/download/1.0/codenetpy.zip"
+)
+
+
+def _download(root: str):
+    print(f"Downloading codenetpy from {CODENETPY_URL} to {root}")
+
+    os.makedirs(root, exist_ok=True)
+
+    with urllib.request.urlopen(CODENETPY_URL) as response:
+        with zipfile.ZipFile(io.BytesIO(response.read())) as zip:
+            zip.extractall(os.path.join(root, "codenetpy"))
+
+
+def _try_load_dataset(root: str):
+    try:
+        dataset = load_dataset(
+            "json",
+            data_dir=os.path.join(root, "codenetpy"),
+            data_files={
+                "train": "codenetpy_train.json",
+                "test": "codenetpy_test.json",
+            },
+            field="data",
+        )
+    except:
+        print(f"Could not find dataset in specified location: {root}")
+        _download(root)
+        dataset = load_dataset(
+            "json",
+            data_dir=os.path.join(root, "codenetpy"),
+            data_files={
+                "train": "codenetpy_train.json",
+                "test": "codenetpy_test.json",
+            },
+            field="data",
+        )
+
+    return dataset
+
+
+def _tokenize_dataset(
+        dataset: DatasetDict, tokenize_and_align_labels: Callable[[Dict], Dict], batch_size: int
 ) -> DatasetDict:
-    dataset = load_dataset(
-        "json",
-        data_dir=root,
-        data_files={
-            "train": "codenetpy_train.json",
-            "test": "codenetpy_test.json",
-        },
-        field="data",
-    )
-
     train_dataset = (
         dataset["train"]
         .filter(lambda example: example["returncode"] != 0)
         .train_test_split(test_size=0.1)
     )
     test_dataset = dataset["test"]
-
-    def tokenize_and_align_labels(example: Dict) -> Dict:
-        example = {
-            "original_src": example["original_src"] + example["changed_src"],
-            "error_class_extra": example["error_class_extra"]
-            + ["Accepted" for _ in example["changed_src"]],
-        }
-
-        tokenized_inputs = tokenizer(
-            example["original_src"], padding=True, truncation=True
-        )
-        tokenized_y = tokenizer(
-            example["error_class_extra"], padding=True, truncation=True
-        )
-
-        tokenized_inputs["labels"] = tokenized_y.input_ids
-        return tokenized_inputs
 
     train_dataset = train_dataset.map(
         tokenize_and_align_labels,
@@ -64,26 +83,34 @@ def detection(
     return dataset
 
 
+def detection(
+    root: str, tokenizer: PreTrainedTokenizerBase, batch_size: int = 4
+) -> DatasetDict:
+    def tokenize_and_align_labels(example: Dict) -> Dict:
+        example = {
+            "original_src": example["original_src"] + example["changed_src"],
+            "error_class_extra": example["error_class_extra"]
+            + ["Accepted" for _ in example["changed_src"]],
+        }
+
+        tokenized_inputs = tokenizer(
+            example["original_src"], padding=True, truncation=True
+        )
+        tokenized_y = tokenizer(
+            example["error_class_extra"], padding=True, truncation=True
+        )
+
+        tokenized_inputs["labels"] = tokenized_y.input_ids
+        return tokenized_inputs
+
+    dataset = _try_load_dataset(root)
+
+    return _tokenize_dataset(dataset, tokenize_and_align_labels, batch_size=batch_size)
+
+
 def localization(
     root: str, tokenizer: PreTrainedTokenizerBase, batch_size: int = 4
 ) -> DatasetDict:
-    dataset = load_dataset(
-        "json",
-        data_dir=root,
-        data_files={
-            "train": "codenetpy_train.json",
-            "test": "codenetpy_test.json",
-        },
-        field="data",
-    )
-
-    train_dataset = (
-        dataset["train"]
-        .filter(lambda example: example["returncode"] != 0)
-        .train_test_split(test_size=0.1)
-    )
-    test_dataset = dataset["test"]
-
     def generate_char_mask(original_src: str, changed_src: str) -> List[int]:
         s = SequenceMatcher(None, original_src, changed_src)
         opcodes = [x for x in s.get_opcodes() if x[0] != "equal"]
@@ -127,45 +154,14 @@ def localization(
         tokenized_inputs["labels"] = labels.tolist()
         return tokenized_inputs
 
-    train_dataset = train_dataset.map(
-        tokenize_and_align_labels,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=train_dataset["train"].column_names,
-    )
-    test_dataset = test_dataset.map(
-        tokenize_and_align_labels,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=test_dataset.column_names,
-    )
+    dataset = _try_load_dataset(root)
 
-    dataset["train"] = train_dataset
-    dataset["test"] = test_dataset
-
-    return dataset
+    return _tokenize_dataset(dataset, tokenize_and_align_labels, batch_size=batch_size)
 
 
 def repair(
     root: str, tokenizer: PreTrainedTokenizerBase, batch_size: int = 4
 ) -> DatasetDict:
-    dataset = load_dataset(
-        "json",
-        data_dir=root,
-        data_files={
-            "train": "codenetpy_train.json",
-            "test": "codenetpy_test.json",
-        },
-        field="data",
-    )
-
-    train_dataset = (
-        dataset["train"]
-        .filter(lambda example: example["returncode"] != 0)
-        .train_test_split(test_size=0.1)
-    )
-    test_dataset = dataset["test"]
-
     max_source_length = 256
     max_target_length = 512
 
@@ -241,36 +237,22 @@ def repair(
         tokenized_inputs["labels"] = labels.tolist()
         return tokenized_inputs
 
-    train_dataset = train_dataset.map(
-        tokenize_and_align_labels,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=train_dataset["train"].column_names,
-    )
-    test_dataset = test_dataset.map(
-        tokenize_and_align_labels,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=test_dataset.column_names,
-    )
+    dataset = _try_load_dataset(root)
 
-    dataset["train"] = train_dataset
-    dataset["test"] = test_dataset
-
-    return dataset
+    return _tokenize_dataset(dataset, tokenize_and_align_labels, batch_size=batch_size)
 
 
 if __name__ == "__main__":
     from transformers import RobertaTokenizerFast
 
     tokenizer = RobertaTokenizerFast.from_pretrained("Salesforce/codet5-base")
-    dataset = detection(root="./data/codenetpy", tokenizer=tokenizer)
+    dataset = detection(root="./data", tokenizer=tokenizer)
     print(dataset)
 
     tokenizer = RobertaTokenizerFast.from_pretrained("microsoft/codebert-base")
-    dataset = localization(root="./data/codenetpy", tokenizer=tokenizer)
+    dataset = localization(root="./data", tokenizer=tokenizer)
     print(dataset)
 
     tokenizer = RobertaTokenizerFast.from_pretrained("Salesforce/codet5-base")
-    dataset = repair(root="./data/codenetpy", tokenizer=tokenizer)
+    dataset = repair(root="./data", tokenizer=tokenizer)
     print(dataset)
