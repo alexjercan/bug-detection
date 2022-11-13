@@ -55,7 +55,9 @@ def _try_load_dataset(root: str):
 
 
 def _tokenize_dataset(
-        dataset: DatasetDict, tokenize_and_align_labels: Callable[[Dict], Dict], batch_size: int
+    dataset: DatasetDict,
+    tokenize_and_align_labels: Callable[[Dict], Dict],
+    batch_size: int,
 ) -> DatasetDict:
     train_dataset = (
         dataset["train"]
