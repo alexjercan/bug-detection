@@ -623,16 +623,23 @@ def filter_linter_error_task(
     error: str,
     output: str,
 ) -> List[str]:
-    style_guide = flake8.get_style_guide(ignore=["E501", "E303"])
+    # Ignore long lines E501, blank spaces E303, ambiguous name E741, format F and warnings W
+    style_guide = flake8.get_style_guide(ignore=["E501", "E303", "E741", "F", "W"])
 
+    black_stats = []
     with tempfile.NamedTemporaryFile("w+", suffix=f".{filename_ext}") as f:
         f.write(original_src)
+        f.flush()
+
+        o, e, r = handle_process(["black",  f.name], timeout=1)
+        if e and r != 0:
+            black_stats = [e]
         report = style_guide.check_files([f.name])
 
-    return report.get_statistics("E")
+    return report.get_statistics("E") + black_stats
 
 
-def filter_linter_error(force: bool = True):
+def filter_linter_error(force: bool = False):
     if os.path.exists(filter_codenetpy_path) and not force:
         print("Filter labels already generated. skiping...")
         return
@@ -645,7 +652,7 @@ def filter_linter_error(force: bool = True):
     with tqdm(total=len(labels)) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
             future_to_problem_id = {
-                executor.submit(filter_linter_error_task, **row): row for row in labels
+                    executor.submit(filter_linter_error_task, **row): row for row in labels
             }
 
             for future in concurrent.futures.as_completed(future_to_problem_id):
@@ -683,7 +690,7 @@ def filter_linter_error(force: bool = True):
         json.dump(filter_labels, f)
 
 
-def generate_train_test_splits(force: bool = True):
+def generate_train_test_splits(force: bool = False):
     if (
         os.path.exists(codenetpy_train_path)
         and os.path.exists(codenetpy_test_path)
@@ -696,6 +703,11 @@ def generate_train_test_splits(force: bool = True):
         labels = json.load(f)
 
     labels_df = pd.DataFrame(labels)
+
+    # Keep only non zero return code
+    labels_df = labels_df[labels_df["returncode"] != 0]
+    # Keep only error classes
+    labels_df = labels_df[labels_df["error_class"].str.contains("Error")]
 
     train_df = labels_df.head(int(len(labels) * 0.8))
     test_df = labels_df.tail(len(labels_df) - int(len(labels_df) * 0.8))
@@ -751,6 +763,6 @@ if __name__ == "__main__":
     generate_error_description_codenet()
     generate_labels_codenet()
     filter_linter_error()
-    generate_train_test_splits()
+    generate_train_test_splits(True)
     filter_problem_statements()
     prepare_kaggle()
