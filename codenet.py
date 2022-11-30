@@ -2,8 +2,8 @@ import os
 import re
 import wget
 import json
-import shutil
 import tarfile
+import tempfile
 import functools
 import traceback
 import subprocess
@@ -12,8 +12,9 @@ import concurrent.futures
 import pandas as pd
 
 from tqdm import tqdm
-from typing import Union
+from typing import Union, List
 from zipfile import ZipFile
+from flake8.api import legacy as flake8
 
 tqdm.pandas()
 
@@ -33,6 +34,7 @@ problem_list_clean_path = generated_path + "problem_list_clean.csv"
 generated_pairs_path = generated_path + "generated_pairs.csv"
 error_pairs_path = generated_path + "error_pairs.csv"
 codenetpy_path = generated_path + "codenetpy.json"
+filter_codenetpy_path = generated_path + "filter_codenetpy.json"
 codenetpy_train_path = generated_path + "codenetpy_train.json"
 codenetpy_test_path = generated_path + "codenetpy_test.json"
 filter_problem_statements_path = generated_path + "problem_descriptions/"
@@ -278,25 +280,25 @@ def download_codenet(force: bool = False) -> None:
         wget.download(f"{data_url}/{tar_name}", out=tar_path)
 
     with tarfile.open(tar_path) as tf:
+
         def is_within_directory(directory, target):
-            
+
             abs_directory = os.path.abspath(directory)
             abs_target = os.path.abspath(target)
-        
+
             prefix = os.path.commonprefix([abs_directory, abs_target])
-            
+
             return prefix == abs_directory
-        
+
         def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
-        
+
             for member in tar.getmembers():
                 member_path = os.path.join(path, member.name)
                 if not is_within_directory(path, member_path):
                     raise Exception("Attempted Path Traversal in Tar File")
-        
-            tar.extractall(path, members, numeric_owner=numeric_owner) 
-            
-        
+
+            tar.extractall(path, members, numeric_owner=numeric_owner)
+
         safe_extract(tf, path=data_path)
 
 
@@ -600,11 +602,88 @@ def generate_labels_codenet(force: bool = False):
                     )
                     pbar.update(1)
 
+    labels = sorted(labels, key=lambda data: data["problem_id"])
+
     with open(codenetpy_path, "w") as f:
         json.dump(labels, f)
 
 
-def generate_train_test_splits(force: bool = False):
+def filter_linter_error_task(
+    original_src: str,
+    changed_src: str,
+    problem_id: str,
+    original_id: str,
+    changed_id: str,
+    language: str,
+    filename_ext: str,
+    original_status: str,
+    returncode: int,
+    error_class: str,
+    error_class_extra: str,
+    error: str,
+    output: str,
+) -> List[str]:
+    style_guide = flake8.get_style_guide(ignore=["E501", "E303"])
+
+    with tempfile.NamedTemporaryFile("w+", suffix=f".{filename_ext}") as f:
+        f.write(original_src)
+        report = style_guide.check_files([f.name])
+
+    return report.get_statistics("E")
+
+
+def filter_linter_error(force: bool = True):
+    if os.path.exists(filter_codenetpy_path) and not force:
+        print("Filter labels already generated. skiping...")
+        return
+
+    with open(codenetpy_path, "r") as f:
+        labels = json.load(f)
+
+    filter_labels = []
+    count = 0
+    with tqdm(total=len(labels)) as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
+            future_to_problem_id = {
+                executor.submit(filter_linter_error_task, **row): row for row in labels
+            }
+
+            for future in concurrent.futures.as_completed(future_to_problem_id):
+                row = future_to_problem_id[future]
+                original_id = row["original_id"]
+                changed_id = row["changed_id"]
+                original_status = row["original_status"]
+                problem_id = row["problem_id"]
+                language = row["language"]
+                filename_ext = row["filename_ext"]
+                try:
+                    linter_errors = future.result()
+                    if not linter_errors:
+                        filter_labels.append(row)
+                    else:
+                        count += 1
+                        print(
+                            f"{problem_id}/{language}/{original_id}.{filename_ext} is skipped because of status: {linter_errors}"
+                        )
+
+                except Exception as exc:
+                    print(
+                        f"{problem_id}/{language}/({original_id}|{changed_id}).{filename_ext} generated an exception: {exc}"
+                    )
+                    traceback.print_exc()
+                else:
+                    pbar.set_description(
+                        f"[Generate Filter Labels] Processing {problem_id} {original_id}"
+                    )
+                    pbar.update(1)
+
+    print(f"Removed {count} sources using flake8 from {len(labels)} sources")
+
+    with open(filter_codenetpy_path, "w") as f:
+        json.dump(filter_labels, f)
+
+
+def generate_train_test_splits(force: bool = True):
     if (
         os.path.exists(codenetpy_train_path)
         and os.path.exists(codenetpy_test_path)
@@ -617,7 +696,6 @@ def generate_train_test_splits(force: bool = False):
         labels = json.load(f)
 
     labels_df = pd.DataFrame(labels)
-    labels_df.sort_values(by=["problem_id"], inplace=True)
 
     train_df = labels_df.head(int(len(labels) * 0.8))
     test_df = labels_df.tail(len(labels_df) - int(len(labels_df) * 0.8))
@@ -672,6 +750,7 @@ if __name__ == "__main__":
     generate_pairs_codenet()
     generate_error_description_codenet()
     generate_labels_codenet()
+    filter_linter_error()
     generate_train_test_splits()
     filter_problem_statements()
     prepare_kaggle()
