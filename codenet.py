@@ -20,7 +20,7 @@ tqdm.pandas()
 
 P = 8
 
-input_path = "../input/"
+input_path = "input/"
 root_path = input_path + "Project_CodeNet/"
 generated_path = input_path + "generated/"
 
@@ -280,9 +280,7 @@ def download_codenet(force: bool = False) -> None:
         wget.download(f"{data_url}/{tar_name}", out=tar_path)
 
     with tarfile.open(tar_path) as tf:
-
         def is_within_directory(directory, target):
-
             abs_directory = os.path.abspath(directory)
             abs_target = os.path.abspath(target)
 
@@ -291,7 +289,6 @@ def download_codenet(force: bool = False) -> None:
             return prefix == abs_directory
 
         def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
-
             for member in tar.getmembers():
                 member_path = os.path.join(path, member.name)
                 if not is_within_directory(path, member_path):
@@ -758,11 +755,11 @@ if __name__ == "__main__":
     os.makedirs(os.path.dirname(generated_path), exist_ok=True)
 
     download_codenet()
-    clean_codenet()
-    generate_pairs_codenet()
-    generate_error_description_codenet()
-    generate_labels_codenet()
-    filter_linter_error()
-    generate_train_test_splits(True)
-    filter_problem_statements()
-    prepare_kaggle()
+    # clean_codenet()
+    # generate_pairs_codenet()
+    # generate_error_description_codenet()
+    # generate_labels_codenet()
+    # filter_linter_error()
+    # generate_train_test_splits(True)
+    # filter_problem_statements()
+    # prepare_kaggle()
