@@ -251,7 +251,7 @@ def codenet_submission_pairs(
         logging.info("pairs already generated. skiping...")
         return pd.read_csv(generated_pairs_path, keep_default_na=False)
 
-    problem_pairs = []
+    df = pd.DataFrame()
     problem_ids = problem_list_df.index.unique()
     with tqdm(total=len(problem_ids)) as pbar:
         with concurrent.futures.ThreadPoolExecutor(max_workers=P) as executor:
@@ -265,7 +265,8 @@ def codenet_submission_pairs(
 
                 try:
                     problem_pairs_df = future.result()
-                    problem_pairs.append(problem_pairs_df)
+                    df = pd.concat([df, problem_pairs_df], ignore_index=True).sort_values("problem_id")
+                    df.to_csv(generated_pairs_path + ".tmp", index=False)
                 except Exception as exc:
                     logging.error(
                         f"{problem_id} generated an exception:"
@@ -275,7 +276,6 @@ def codenet_submission_pairs(
                     pbar.set_description(f"[generate pairs] processing {problem_id}")
                     pbar.update(1)
 
-    df = pd.concat(problem_pairs, ignore_index=True).sort_values("problem_id")
     df.to_csv(generated_pairs_path, index=False)
 
     return df
