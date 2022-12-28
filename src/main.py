@@ -1,3 +1,6 @@
+from pathlib import Path
+import resource
+import glob
 import logging
 import os
 
@@ -5,18 +8,25 @@ import concurrent.futures
 import pandas as pd
 import subprocess
 import traceback
+import uuid
 import wget
 from difflib import SequenceMatcher
 from multiprocessing import cpu_count
 from tqdm.auto import tqdm
 from typing import Optional, Tuple
 
+MAX_VIRTUAL_MEMORY = 10 * 1024 * 1024 # 10 MB
 P = int(os.environ.get("CODENET_CPUS", cpu_count()))
 
 SUPPORTED_LANGUAGES = ["C++"]
 EXTENSIONS = {"C++": "cpp"}
 
-SUPPORTED_ERRORS = ["Accepted", "Runtime Error", "Time Limit Exceeded", "Memory Limit Exceeded"]
+SUPPORTED_ERRORS = [
+    "Accepted",
+    "Runtime Error",
+    "Time Limit Exceeded",
+    "Memory Limit Exceeded",
+]
 
 assert set(SUPPORTED_LANGUAGES).issubset(set(EXTENSIONS)), (
     "Expected to have extension for all supported languages, "
@@ -90,6 +100,39 @@ def linter_check_submission(problem_id: str, language: str, submission_id: str) 
             errors="ignore",
         )
         return result.returncode == 0
+
+    raise NotImplementedError(f"{language} not implemented yet")
+
+
+def execute_source(
+    problem_id: str,
+    language: str,
+    submission_id: str,
+    input: str,
+    output: str,
+    timeout: Optional[float] = None,
+) -> Optional[str]:
+    path = id2submission(problem_id, language, submission_id)
+
+    if language == "C++":
+        out = f"/tmp/{uuid.uuid4()}.out"
+        result = subprocess.run(["g++", path, "-o", out], capture_output=True)
+        if result.returncode != 0:
+            return None
+
+        try:
+            result = subprocess.run(
+                [out],
+                input=input,
+                timeout=timeout,
+                capture_output=True,
+                encoding="utf-8",
+                errors="ignore",
+                preexec_fn=lambda: resource.setrlimit(resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY))
+            )
+            return str(result.returncode)
+        except subprocess.TimeoutExpired:
+            return "TLE"
 
     raise NotImplementedError(f"{language} not implemented yet")
 
@@ -170,8 +213,14 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
         "changed_src",
         "change",
         "line",
+        "error",
     ]
     dfs = []
+
+    with open(id2inout(problem_id, name="input"), "r") as f:
+        input = f.read()
+    with open(id2inout(problem_id, name="output"), "r") as f:
+        output = f.read()
 
     problem_path = os.path.join(META_PATH, f"{problem_id}.csv")
     problem_df = pd.read_csv(problem_path, index_col="submission_id")
@@ -224,6 +273,13 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                 if not original_ok:
                     continue
 
+                # Check and get the error annotations
+                error = execute_source(
+                    problem_id, language, original_id, input, output, timeout=2.0
+                )
+                if error is None:
+                    continue
+
                 submissions_diff_dfs.append(
                     (
                         problem_id,
@@ -233,6 +289,7 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                         changed_format_src,
                         change,
                         line,
+                        error,
                     )
                 )
 
@@ -251,9 +308,29 @@ def codenet_submission_pairs(
         logging.info("pairs already generated. skiping...")
         return pd.read_csv(generated_pairs_path, keep_default_na=False)
 
-    df = pd.DataFrame()
+    tmp_paths = glob.glob(generated_pairs_path + ".tmp.*")
     problem_ids = problem_list_df.index.unique()
-    with tqdm(total=len(problem_ids)) as pbar:
+    count = problem_ids.shape[0]
+    initial = 0
+
+    dfs = []
+    if tmp_paths:
+        logging.info("loading previous checkpoint...")
+        xs = []
+        for path in tmp_paths:
+            try:
+                xs.append(pd.read_csv(path))
+            except Exception as e:
+                pass
+        df = pd.concat(xs, ignore_index=True)
+        check_problem_ids = [Path(path).suffix[1:] for path in tmp_paths]
+        problem_ids = problem_ids[~problem_ids.isin(check_problem_ids)]
+        initial = count - problem_ids.shape[0]
+        dfs = [df]
+    else:
+        df = pd.DataFrame()
+
+    with tqdm(total=count, initial=initial) as pbar:
         with concurrent.futures.ThreadPoolExecutor(max_workers=P) as executor:
             future_to_problem_id = {
                 executor.submit(codenet_submission_pairs_task, problem_id): problem_id
@@ -265,8 +342,8 @@ def codenet_submission_pairs(
 
                 try:
                     problem_pairs_df = future.result()
-                    df = pd.concat([df, problem_pairs_df], ignore_index=True).sort_values("problem_id")
-                    df.to_csv(generated_pairs_path + ".tmp", index=False)
+                    dfs.append(problem_pairs_df)
+                    problem_pairs_df.to_csv(generated_pairs_path + f".tmp.{problem_id}", index=False)
                 except Exception as exc:
                     logging.error(
                         f"{problem_id} generated an exception:"
@@ -276,6 +353,7 @@ def codenet_submission_pairs(
                     pbar.set_description(f"[generate pairs] processing {problem_id}")
                     pbar.update(1)
 
+    df = pd.concat(dfs, ignore_index=True).sort_values("problem_id")
     df.to_csv(generated_pairs_path, index=False)
 
     return df
