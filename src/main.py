@@ -1,21 +1,21 @@
-from pathlib import Path
-import resource
-import glob
 import logging
 import os
 
 import concurrent.futures
+import glob
 import pandas as pd
+import resource
 import subprocess
 import traceback
 import uuid
 import wget
 from difflib import SequenceMatcher
 from multiprocessing import cpu_count
+from pathlib import Path
 from tqdm.auto import tqdm
 from typing import Optional, Tuple
 
-MAX_VIRTUAL_MEMORY = 10 * 1024 * 1024 # 10 MB
+MAX_VIRTUAL_MEMORY = 10 * 1024 * 1024  # 10 MB
 P = int(os.environ.get("CODENET_CPUS", cpu_count()))
 
 SUPPORTED_LANGUAGES = ["C++"]
@@ -69,6 +69,17 @@ def read_format_submission(
             errors="ignore",
         )
         return result.returncode == 0, result.stdout
+    if language == "Python":
+        with open(path, "r") as f:
+            content = f.read()
+        result = subprocess.run(
+            ["black", "-q", "-"],
+            input=content,
+            capture_output=True,
+            encoding="utf-8",
+            errors="ignore",
+        )
+        return result.returncode == 0, result.stdout
 
     raise NotImplementedError(f"{language} not implemented yet")
 
@@ -95,6 +106,17 @@ def linter_check_submission(problem_id: str, language: str, submission_id: str) 
     if language == "C++":
         result = subprocess.run(
             ["clang-tidy", path],
+            capture_output=True,
+            encoding="utf-8",
+            errors="ignore",
+            preexec_fn=lambda: resource.setrlimit(
+                resource.RLIMIT_AS, (1024 * 1024 * 1024, resource.RLIM_INFINITY)
+            ),
+        )
+        return result.returncode == 0
+    if language == "Python":
+        result = subprocess.run(
+            ["flake8", path],
             capture_output=True,
             encoding="utf-8",
             errors="ignore",
@@ -128,9 +150,38 @@ def execute_source(
                 capture_output=True,
                 encoding="utf-8",
                 errors="ignore",
-                preexec_fn=lambda: resource.setrlimit(resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY))
+                preexec_fn=lambda: resource.setrlimit(
+                    resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY)
+                ),
             )
             return str(result.returncode)
+        except subprocess.TimeoutExpired:
+            return "TLE"
+    if language == "Python":
+        try:
+            result = subprocess.run(
+                ["python3", path],
+                input=input,
+                timeout=timeout,
+                capture_output=True,
+                encoding="utf-8",
+                errors="ignore",
+                preexec_fn=lambda: resource.setrlimit(
+                    resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY)
+                ),
+            )
+            rs = "|".join(
+                [
+                    r"^(\w*Error):.*",
+                    r"(\w*Warning):.*",
+                ]
+            )
+
+            p_class = re.compile(rs, re.MULTILINE)
+            error_class = p_class.findall(result.stderr)
+            if not error_class:
+                return str(result.returncode)
+            return functools.reduce(lambda acc, x: acc or x, error_class[0], None)
         except subprocess.TimeoutExpired:
             return "TLE"
 
@@ -245,6 +296,8 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
 
             submission_ids = submission_df.index.unique()
             for original_id, changed_id in zip(submission_ids, submission_ids[1:]):
+                logging.debug(f"Checking submission {id2submission(problem_id, language, original_id)}")
+
                 # Check if status is non-Accepted -> Accepted; otherwise skip
                 original_status = submission_df.loc[original_id, "status"]
                 changed_status = submission_df.loc[changed_id, "status"]
@@ -273,12 +326,20 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                 if not original_ok:
                     continue
 
-                # Check and get the error annotations
-                error = execute_source(
-                    problem_id, language, original_id, input, output, timeout=2.0
-                )
+                # Check and get the error annotations. If the original status
+                # is MLE we will trust it :) because my pc crashes
+                if original_status == "Memory Limit Exceeded":
+                    error = "MLE"
+                elif original_status == "Time Limit Exceeded":
+                    error = "TLE"
+                else:
+                    error = execute_source(
+                        problem_id, language, original_id, input, output, timeout=2.0
+                    )
                 if error is None:
                     continue
+
+                logging.debug(f"Added {id2submission(problem_id, language, original_id)} to csv")
 
                 submissions_diff_dfs.append(
                     (
@@ -343,7 +404,9 @@ def codenet_submission_pairs(
                 try:
                     problem_pairs_df = future.result()
                     dfs.append(problem_pairs_df)
-                    problem_pairs_df.to_csv(generated_pairs_path + f".tmp.{problem_id}", index=False)
+                    problem_pairs_df.to_csv(
+                        generated_pairs_path + f".tmp.{problem_id}", index=False
+                    )
                 except Exception as exc:
                     logging.error(
                         f"{problem_id} generated an exception:"
