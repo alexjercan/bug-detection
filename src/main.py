@@ -1,11 +1,16 @@
+import functools
 import logging
 import os
 
+import argparse
 import concurrent.futures
 import glob
+import openai
 import pandas as pd
+import re
 import resource
 import subprocess
+import time
 import traceback
 import uuid
 import wget
@@ -15,11 +20,17 @@ from pathlib import Path
 from tqdm.auto import tqdm
 from typing import Optional, Tuple
 
-MAX_VIRTUAL_MEMORY = 10 * 1024 * 1024  # 10 MB
+LOGGER = logging.getLogger(__name__)
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+
+assert OPENAI_API_KEY is not None, "You have to provide an api key for openai"
+
+MAX_VIRTUAL_MEMORY = 100 * 1024 * 1024  # 100 MB
 P = int(os.environ.get("CODENET_CPUS", cpu_count()))
 
-SUPPORTED_LANGUAGES = ["C++"]
-EXTENSIONS = {"C++": "cpp"}
+SUPPORTED_LANGUAGES = ["C++", "Python"]
+EXTENSIONS = {"C++": "cpp", "Python": "py"}
 
 SUPPORTED_ERRORS = [
     "Accepted",
@@ -194,14 +205,14 @@ def codenet_download_data(force: bool = False) -> None:
     tar_path = os.path.join(INPUT_PATH, tar_name)
 
     if os.path.exists(ROOT_PATH) and not force:
-        logging.info(f"dataset root dir found at {ROOT_PATH}. skiping...")
+        LOGGER.info(f"dataset root dir found at {ROOT_PATH}. skiping...")
         return
 
     if not os.path.exists(tar_path) or force:
-        logging.debug(f"download dataset from {data_url}/{tar_name}")
+        LOGGER.debug(f"download dataset from {data_url}/{tar_name}")
         wget.download(f"{data_url}/{tar_name}", out=tar_path)
 
-    logging.debug(f"extract codenet to {INPUT_PATH}")
+    LOGGER.debug(f"extract codenet to {INPUT_PATH}")
     result = subprocess.run(
         f"tar -xzvf {tar_path} -C {INPUT_PATH}",
         capture_output=True,
@@ -210,7 +221,7 @@ def codenet_download_data(force: bool = False) -> None:
         errors="ignore",
     )
 
-    logging.debug(f"process finished with status {result.returncode}")
+    LOGGER.debug(f"process finished with status {result.returncode}")
 
 
 def codenet_filter_problems(force: bool = False) -> pd.DataFrame:
@@ -221,35 +232,35 @@ def codenet_filter_problems(force: bool = False) -> pd.DataFrame:
     out_file_path = os.path.join(GENERATED_PATH, "problem_list_clean.csv")
 
     if os.path.exists(out_file_path) and not force:
-        logging.info("dataset was already cleaned. skiping...")
+        LOGGER.info("dataset was already cleaned. skiping...")
         return pd.read_csv(out_file_path, index_col="id")
 
     file_path = os.path.join(META_PATH, "problem_list.csv")
-    logging.debug(f"cleaning {file_path}")
+    LOGGER.debug(f"cleaning {file_path}")
 
     problem_list_df = pd.read_csv(file_path, index_col="id")
 
-    logging.debug("fillna for time limit")
+    LOGGER.debug("fillna for time limit")
     problem_list_df["time_limit"].fillna(
         problem_list_df["time_limit"].median(), inplace=True
     )
-    logging.debug("fillna for memory limit")
+    LOGGER.debug("fillna for memory limit")
     problem_list_df["memory_limit"].fillna(
         problem_list_df["memory_limit"].median(), inplace=True
     )
 
-    logging.debug("compute input mask")
+    LOGGER.debug("compute input mask")
     problem_ids = problem_list_df.index.unique()
     input_mask = [os.path.exists(id2inout(problem_id)) for problem_id in problem_ids]
 
-    logging.debug("remove problems that do not have input")
+    LOGGER.debug("remove problems that do not have input")
     problem_list_df = problem_list_df.loc[input_mask]
     problem_ids = problem_list_df.index.unique()
 
-    logging.debug("drop rating, targs and complexity")
+    LOGGER.debug("drop rating, targs and complexity")
     problem_list_df.drop(["rating", "tags", "complexity"], axis="columns", inplace=True)
 
-    logging.debug(f"save to {out_file_path}")
+    LOGGER.debug(f"save to {out_file_path}")
     problem_list_df.to_csv(out_file_path)
 
     return problem_list_df
@@ -296,7 +307,9 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
 
             submission_ids = submission_df.index.unique()
             for original_id, changed_id in zip(submission_ids, submission_ids[1:]):
-                logging.debug(f"Checking submission {id2submission(problem_id, language, original_id)}")
+                LOGGER.debug(
+                    f"Checking submission {id2submission(problem_id, language, original_id)}"
+                )
 
                 # Check if status is non-Accepted -> Accepted; otherwise skip
                 original_status = submission_df.loc[original_id, "status"]
@@ -339,7 +352,9 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                 if error is None:
                     continue
 
-                logging.debug(f"Added {id2submission(problem_id, language, original_id)} to csv")
+                LOGGER.debug(
+                    f"Added {id2submission(problem_id, language, original_id)} to csv"
+                )
 
                 submissions_diff_dfs.append(
                     (
@@ -366,7 +381,7 @@ def codenet_submission_pairs(
     generated_pairs_path = os.path.join(GENERATED_PATH, "generated_pairs.csv")
 
     if os.path.exists(generated_pairs_path) and not force:
-        logging.info("pairs already generated. skiping...")
+        LOGGER.info("pairs already generated. skiping...")
         return pd.read_csv(generated_pairs_path, keep_default_na=False)
 
     tmp_paths = glob.glob(generated_pairs_path + ".tmp.*")
@@ -376,13 +391,16 @@ def codenet_submission_pairs(
 
     dfs = []
     if tmp_paths:
-        logging.info("loading previous checkpoint...")
+        LOGGER.info("loading previous checkpoint...")
         xs = []
         for path in tmp_paths:
             try:
                 xs.append(pd.read_csv(path))
-            except Exception as e:
-                pass
+            except Exception as exc:
+                LOGGER.warn(
+                    f"{path} generated an exception:"
+                    + f"{exc}\ntraceback:\n{traceback.format_exc()}"
+                )
         df = pd.concat(xs, ignore_index=True)
         check_problem_ids = [Path(path).suffix[1:] for path in tmp_paths]
         problem_ids = problem_ids[~problem_ids.isin(check_problem_ids)]
@@ -408,7 +426,7 @@ def codenet_submission_pairs(
                         generated_pairs_path + f".tmp.{problem_id}", index=False
                     )
                 except Exception as exc:
-                    logging.error(
+                    LOGGER.error(
                         f"{problem_id} generated an exception:"
                         + f"{exc}\ntraceback:\n{traceback.format_exc()}"
                     )
@@ -422,13 +440,99 @@ def codenet_submission_pairs(
     return df
 
 
+def make_codex_prompt(source: str, language: str, line: int) -> str:
+    if language == "C++":
+        comment = "//"
+    elif language == "Python":
+        comment = "#"
+    else:
+        raise NotImplementedError(f"{language} not implemented yet")
+
+    lines = source.splitlines()
+    lines[line] = f"{lines[line]} {comment} Fixme"
+    lines.append(f"{comment} Q: Propose a fix for the buggy line of code")
+    lines.append(f"{comment} A:")
+
+    return "\n".join(lines)
+
+
+def generate_codex_results(
+    submission_pairs_df: pd.DataFrame, force: bool = False
+) -> pd.DataFrame:
+    codex_results_path = os.path.join(GENERATED_PATH, "codex_results.csv")
+
+    if os.path.exists(codex_results_path) and not force:
+        LOGGER.info("codex results already generated. skiping...")
+        return pd.read_csv(codex_results_path, keep_default_na=False)
+
+    submission_pairs_df = submission_pairs_df.iloc[:100]
+
+    results = []
+    with tqdm(total=len(submission_pairs_df)) as pbar:
+        for pair_id, row in submission_pairs_df.iterrows():
+            try:
+                prompt = make_codex_prompt(
+                    row["original_src"], row["language"], row["line"]
+                )
+                response = openai.Completion.create(
+                    model="code-davinci-002",
+                    prompt=prompt,
+                    temperature=0.5,
+                    max_tokens=256,
+                    top_p=1,
+                )
+                codex_result = response["choices"][0]["text"]
+                time.sleep(15)
+                results.append((pair_id, codex_result))
+            except Exception as exc:
+                LOGGER.error(
+                    f"{pair_id} generated an exception:"
+                    + f"{exc}\ntraceback:\n{traceback.format_exc()}"
+                )
+            else:
+                pbar.set_description(f"[generate codex] processing {pair_id}")
+                pbar.update(1)
+
+    results = pd.DataFrame(results, columns=["index", "codex_predicted"])
+    results.set_index("index", inplace=True)
+    submission_pairs_df = submission_pairs_df.join(results)
+    submission_pairs_df["correct"] = submission_pairs_df.apply(
+        lambda row: row["changed_src"].splitlines()[row["line"]]
+        == row["codex_predicted"],
+        axis="columns",
+    )
+
+    submission_pairs_df.to_csv(codex_results_path, index=False)
+
+    return submission_pairs_df
+
+
 if __name__ == "__main__":
+    levels = {
+        "critical": logging.CRITICAL,
+        "error": logging.ERROR,
+        "warn": logging.WARNING,
+        "warning": logging.WARNING,
+        "info": logging.INFO,
+        "debug": logging.DEBUG,
+    }
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-log",
+        "--loglevel",
+        default="warning",
+        dest="loglevel",
+        choices=list(levels.keys()),
+        help="Provide logging level. Example --loglevel debug, default=warning",
+    )
+    args = parser.parse_args()
+
+    LOGGER.addHandler(logging.StreamHandler())
+    LOGGER.addHandler(logging.FileHandler(os.getenv("LOG_FILE", "codenet.log")))
+    LOGGER.setLevel(levels[args.loglevel])
+
     logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(os.getenv("LOG_FILE", "codenet.log")),
-        ],
-        level=logging.DEBUG,
         format="%(levelname)s: %(asctime)s %(message)s",
         datefmt="%d/%m/%y %H:%M:%S",
     )
@@ -439,3 +543,7 @@ if __name__ == "__main__":
     codenet_download_data()
     problem_list_df = codenet_filter_problems()
     submission_pairs_df = codenet_submission_pairs(problem_list_df)
+    codex_df = generate_codex_results(submission_pairs_df)
+
+    correct = codex_df["correct"].sum()
+    print(f"The accuracy of the codex api is {correct / len(codex_df)}")
