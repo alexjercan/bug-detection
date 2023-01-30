@@ -496,24 +496,25 @@ def generate_codex_results(
     results = pd.DataFrame(results, columns=["index", "codex_predicted"])
     results.set_index("index", inplace=True)
     submission_pairs_df = submission_pairs_df.join(results)
+    submission_pairs_df["codex_predicted"] = submission_pairs_df["codex_predicted"].astype(str)
 
-    def check_correct(changed_line: str, codex_predicted: str) -> bool:
+    submission_pairs_df.to_csv(codex_results_path, index=False)
+
+    line_str = submission_pairs_df.apply(lambda row: row["changed_src"].splitlines()[row["line"]], axis="columns")
+
+    def codex_to_line_str(codex_predicted: str) -> str:
         codex_predicted = codex_predicted.strip()
         codex_lines = codex_predicted.splitlines()
         if len(codex_lines) > 0:
             codex_predicted = codex_lines[0]
+        return codex_predicted
 
-        return changed_line == codex_predicted
+    codex_line_str = submission_pairs_df.apply(lambda row: codex_to_line_str(str(row["codex_predicted"])), axis="columns")
 
-    submission_pairs_df["correct"] = submission_pairs_df.apply(
-        lambda row: check_correct(
-            row["changed_src"].splitlines()[row["line"]],
-            row["codex_predicted"]
-        ),
-        axis="columns",
-    )
+    codex_df = submission_pairs_df.copy()
+    codex_df["correct"] = line_str == codex_line_str
 
-    submission_pairs_df.to_csv(codex_results_path, index=False)
+    display_codex_accuracy(codex_df)
 
     return submission_pairs_df
 
@@ -562,5 +563,3 @@ if __name__ == "__main__":
     problem_list_df = codenet_filter_problems()
     submission_pairs_df = codenet_submission_pairs(problem_list_df)
     codex_df = generate_codex_results(submission_pairs_df)
-
-    display_codex_accuracy(codex_df)
