@@ -465,7 +465,7 @@ def generate_codex_results(
         LOGGER.info("codex results already generated. skiping...")
         return pd.read_csv(codex_results_path, keep_default_na=False)
 
-    submission_pairs_df = submission_pairs_df.iloc[:100]
+    submission_pairs_df = submission_pairs_df.iloc[:1000]
 
     results = []
     with tqdm(total=len(submission_pairs_df)) as pbar:
@@ -496,15 +496,33 @@ def generate_codex_results(
     results = pd.DataFrame(results, columns=["index", "codex_predicted"])
     results.set_index("index", inplace=True)
     submission_pairs_df = submission_pairs_df.join(results)
+
+    def check_correct(changed_line: str, codex_predicted: str) -> bool:
+        codex_predicted = codex_predicted.strip()
+        codex_lines = codex_predicted.splitlines()
+        if len(codex_lines) > 0:
+            codex_predicted = codex_lines[0]
+
+        return changed_line == codex_predicted
+
     submission_pairs_df["correct"] = submission_pairs_df.apply(
-        lambda row: row["changed_src"].splitlines()[row["line"]]
-        == row["codex_predicted"],
+        lambda row: check_correct(
+            row["changed_src"].splitlines()[row["line"]],
+            row["codex_predicted"]
+        ),
         axis="columns",
     )
 
     submission_pairs_df.to_csv(codex_results_path, index=False)
 
     return submission_pairs_df
+
+
+def display_codex_accuracy(codex_df: pd.DataFrame):
+    codex_lang_df = codex_df.groupby("language")["correct"].agg(["sum", "count"])
+    codex_lang_df["accuracy"] = codex_lang_df["sum"] / codex_lang_df["count"]
+
+    print(codex_lang_df[["accuracy"]])
 
 
 if __name__ == "__main__":
@@ -545,5 +563,4 @@ if __name__ == "__main__":
     submission_pairs_df = codenet_submission_pairs(problem_list_df)
     codex_df = generate_codex_results(submission_pairs_df)
 
-    correct = codex_df["correct"].sum()
-    print(f"The accuracy of the codex api is {correct / len(codex_df)}")
+    display_codex_accuracy(codex_df)
