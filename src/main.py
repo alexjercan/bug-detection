@@ -465,7 +465,8 @@ def generate_codex_results(
         LOGGER.info("codex results already generated. skiping...")
         return pd.read_csv(codex_results_path, keep_default_na=False)
 
-    submission_pairs_df = submission_pairs_df.iloc[:1000]
+    # Cut down from the number of examples
+    submission_pairs_df = submission_pairs_df.groupby("language").head(500)
 
     results = []
     with tqdm(total=len(submission_pairs_df)) as pbar:
