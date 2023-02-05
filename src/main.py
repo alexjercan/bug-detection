@@ -450,7 +450,7 @@ def make_codex_prompt(source: str, language: str, line: int) -> str:
 
     lines = source.splitlines()
     lines[line] = f"{lines[line]} {comment} Fixme"
-    lines.append(f"{comment} Q: Propose a fix for the buggy line of code")
+    lines.append(f"{comment} Q: Propose a fix for the buggy line of code, using a single line of {language} code")
     lines.append(f"{comment} A:")
 
     return "\n".join(lines)
@@ -501,6 +501,10 @@ def generate_codex_results(
 
     submission_pairs_df.to_csv(codex_results_path, index=False)
 
+    return submission_pairs_df
+
+
+def compute_codex_accuracy(submission_pairs_df: pd.DataFrame) -> pd.DataFrame:
     line_str = submission_pairs_df.apply(lambda row: row["changed_src"].splitlines()[row["line"]], axis="columns")
 
     def codex_to_line_str(codex_predicted: str) -> str:
@@ -515,9 +519,7 @@ def generate_codex_results(
     codex_df = submission_pairs_df.copy()
     codex_df["correct"] = line_str == codex_line_str
 
-    display_codex_accuracy(codex_df)
-
-    return submission_pairs_df
+    return codex_df
 
 
 def display_codex_accuracy(codex_df: pd.DataFrame):
@@ -564,3 +566,6 @@ if __name__ == "__main__":
     problem_list_df = codenet_filter_problems()
     submission_pairs_df = codenet_submission_pairs(problem_list_df)
     codex_df = generate_codex_results(submission_pairs_df)
+
+    codex_df = compute_codex_accuracy(codex_df)
+    display_codex_accuracy(codex_df)
