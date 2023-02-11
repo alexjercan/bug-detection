@@ -7,7 +7,7 @@ Docker image using flask to test the bug detection pipeline.
 ### Docker Compose
 
 ```console
-docker-compose up
+docker compose up
 ```
 
 ### Docker
@@ -37,13 +37,13 @@ The application responds to the following routes:
   results for the error description, token classes and new source code.
 
   For example the following curl request should return the error message, token
-  classes and new source code. 
+  classes and new source code.
 
   ```console
   curl -X POST -m 200 -H "Content-Type: application/json" -d '{"source_code": "A = map(input().split())\nprint(A)"}' http://localhost:8080//api/inference
   ```
 
-  And by using 
+  And by using
 
   ```console
   curl -X POST -m 200 -H "Content-Type: application/json" -d '{"source_code": "A = map(input().split())\nprint(A)", "beam_size": 5}' http://localhost:8080//api/inference

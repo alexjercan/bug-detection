@@ -9,7 +9,7 @@ Docker image using streamlit to test the bug detection pipeline.
 ### Docker Compose
 
 ```console
-docker-compose up
+docker compose up
 ```
 
 ### Docker
