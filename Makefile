@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-
+.PHONY: install format lint test.safety codenetpy bugnet codex
 
 ### QUICK
 # ¯¯¯¯¯¯¯

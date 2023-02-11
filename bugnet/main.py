@@ -41,7 +41,9 @@ assert set(SUPPORTED_LANGUAGES).issubset(set(EXTENSIONS)), (
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 INPUT_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "input")
-LOG_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "bugnet.log")
+LOG_PATH = os.path.join(
+    os.path.abspath(os.path.join(dir_path, os.pardir)), "bugnet.log"
+)
 ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DATA_PATH = os.path.join(ROOT_PATH, "data")
 META_PATH = os.path.join(ROOT_PATH, "metadata")
