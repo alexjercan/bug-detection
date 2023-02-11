@@ -1,15 +1,13 @@
 import logging
 
 import numpy as np
-
 from copy import copy
-from typing import Union, List
 from transformers import (
+    RobertaForTokenClassification,
     RobertaTokenizerFast,
     T5ForConditionalGeneration,
-    RobertaForTokenClassification,
 )
-
+from typing import List, Union
 
 BEAM_SIZE = 5
 
@@ -150,7 +148,9 @@ def predict_masked_source_code(
         new_building_tokens = []
 
         for bs, bt in zip(building_sources, building_tokens):
-            i1, i2, options = predict_masked_source_code_step(tokenizer, model, error, bt, bs, beam_size)
+            i1, i2, options = predict_masked_source_code_step(
+                tokenizer, model, error, bt, bs, beam_size
+            )
 
             for option in options:
                 new_building_sources.append(bs[:i1] + option + bs[i2:])
@@ -172,7 +172,11 @@ def predict_source_code(
 ) -> List[List[str]]:
     new_sources = []
     for error, token, source in zip(errors, tokens, sources):
-        new_sources.append(predict_masked_source_code(tokenizer, model, error, token, source, beam_size))
+        new_sources.append(
+            predict_masked_source_code(
+                tokenizer, model, error, token, source, beam_size
+            )
+        )
 
     return new_sources
 
@@ -223,7 +227,9 @@ class Session:
 
         logging.info("Generating source code...")
         new_sources = [[] for _ in source_code]
-        for error_description, token_class in zip(zip(*error_descriptions), zip(*token_classes)):
+        for error_description, token_class in zip(
+            zip(*error_descriptions), zip(*token_classes)
+        ):
             new_source = predict_source_code(
                 self.tokenizer_cg,
                 self.model_cg,

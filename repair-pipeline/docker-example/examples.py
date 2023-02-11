@@ -26,4 +26,3 @@ p = 1
 for a in A:
     p = p * int(a)
 print(p)
-

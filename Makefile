@@ -4,17 +4,17 @@
 ### QUICK
 # ¯¯¯¯¯¯¯
 
-install: codenet.install ## Install
+install: ## Install dependencies
+	pip install -r requirements-dev.txt --upgrade --no-warn-script-location
 
-start: codenet.start ## Train
+format: ## Format
+	python -m black ./codenetpy ./bugnet ./repair-pipeline ./codex --exclude .venv/
+	python -m isort ./codenetpy ./bugnet ./repair-pipeline ./codex --skip .venv/
 
-format: format.isort format.black ## Format
+lint: ## Lint
+	python -m flake8 ./codenetpy ./bugnet ./repair-pipeline ./codex
 
-lint: test.lint ## Lint
+test.safety: ## Check for dependencies security breach with safety
+	python -m safety check
 
 export PYTHONPATH=$PYTHONPATH:src
-
-include makefiles/codenet.mk
-include makefiles/test.mk
-include makefiles/format.mk
-include makefiles/help.mk

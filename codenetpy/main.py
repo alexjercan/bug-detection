@@ -1,15 +1,14 @@
-import os
-import re
-import wget
-import json
-import tarfile
 import functools
-import traceback
-import subprocess
+import json
+import os
+
 import concurrent.futures
-
 import pandas as pd
-
+import re
+import subprocess
+import tarfile
+import traceback
+import wget
 from tqdm import tqdm
 from typing import Union
 from zipfile import ZipFile
@@ -20,7 +19,7 @@ P = 8
 
 input_path = "../input/"
 root_path = input_path + "Project_CodeNet/"
-generated_path = input_path + "generated/"
+generated_path = input_path + "codenetpy/"
 
 data_path = root_path + "data/"
 generated_data_path = generated_path + "data/"

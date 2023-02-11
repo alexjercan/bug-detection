@@ -1,10 +1,8 @@
-import streamlit as st
 import numpy as np
-
-from inference import Session
+import streamlit as st
 from difflib import SequenceMatcher
+from inference import Session
 from typing import List
-
 
 LIGHT_THEME = {"norm_color": "black", "ws_color": "lightgrey"}
 DARK_THEME = {"norm_color": "white", "ws_color": "grey"}

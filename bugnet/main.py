@@ -50,7 +50,7 @@ ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DATA_PATH = os.path.join(ROOT_PATH, "data")
 META_PATH = os.path.join(ROOT_PATH, "metadata")
 DERIVED_PATH = os.path.join(ROOT_PATH, "derived")
-GENERATED_PATH = os.path.join(INPUT_PATH, "generated")
+GENERATED_PATH = os.path.join(INPUT_PATH, "bugnet")
 
 
 def id2inout(problem_id: str, name: str = "input") -> str:
@@ -450,7 +450,9 @@ def make_codex_prompt(source: str, language: str, line: int) -> str:
 
     lines = source.splitlines()
     lines[line] = f"{lines[line]} {comment} Fixme"
-    lines.append(f"{comment} Q: Propose a fix for the buggy line of code, using a single line of {language} code")
+    lines.append(
+        f"{comment} Q: Propose a fix for the buggy line of code, using a single line of {language} code"
+    )
     lines.append(f"{comment} A:")
 
     return "\n".join(lines)
@@ -497,7 +499,9 @@ def generate_codex_results(
     results = pd.DataFrame(results, columns=["index", "codex_predicted"])
     results.set_index("index", inplace=True)
     submission_pairs_df = submission_pairs_df.join(results)
-    submission_pairs_df["codex_predicted"] = submission_pairs_df["codex_predicted"].astype(str)
+    submission_pairs_df["codex_predicted"] = submission_pairs_df[
+        "codex_predicted"
+    ].astype(str)
 
     submission_pairs_df.to_csv(codex_results_path, index=False)
 
@@ -505,7 +509,9 @@ def generate_codex_results(
 
 
 def compute_codex_accuracy(submission_pairs_df: pd.DataFrame) -> pd.DataFrame:
-    line_str = submission_pairs_df.apply(lambda row: row["changed_src"].splitlines()[row["line"]], axis="columns")
+    line_str = submission_pairs_df.apply(
+        lambda row: row["changed_src"].splitlines()[row["line"]], axis="columns"
+    )
 
     def codex_to_line_str(codex_predicted: str) -> str:
         codex_predicted = codex_predicted.strip()
@@ -514,7 +520,9 @@ def compute_codex_accuracy(submission_pairs_df: pd.DataFrame) -> pd.DataFrame:
             codex_predicted = codex_lines[0]
         return codex_predicted
 
-    codex_line_str = submission_pairs_df.apply(lambda row: codex_to_line_str(str(row["codex_predicted"])), axis="columns")
+    codex_line_str = submission_pairs_df.apply(
+        lambda row: codex_to_line_str(str(row["codex_predicted"])), axis="columns"
+    )
 
     codex_df = submission_pairs_df.copy()
     codex_df["correct"] = line_str == codex_line_str

@@ -1,8 +1,9 @@
 from transformers import (
+    RobertaForTokenClassification,
     RobertaTokenizerFast,
     T5ForConditionalGeneration,
-    RobertaForTokenClassification,
 )
+
 
 def prepare_model():
     tokenizer_ed = RobertaTokenizerFast.from_pretrained(
