@@ -80,7 +80,7 @@ def view(
     return results
 
 
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_model():
     return Session()
 
