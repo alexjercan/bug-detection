@@ -17,4 +17,13 @@ lint: ## Lint
 test.safety: ## Check for dependencies security breach with safety
 	python -m safety check
 
+codenetpy: ## CodeNetPy
+	python codenetpy/main.py
+
+bugnet: ## BugNet
+	python bugnet/main.py --log info
+
+codex: ## Codex Experiments
+	python codex/main.py --log info
+
 export PYTHONPATH=$PYTHONPATH:src

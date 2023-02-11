@@ -17,8 +17,19 @@ dataset, the `bugnet` folder contains the script used to generate the `BugNet`
 dataset, and the `repair-pipeline` folder contains the demo applications for
 the models trained only on `CodeNetPy`.
 
+To install the dependencies for development create a venv:
+
+```console
+python -m venv .venv
+source .venv/bin/activate
+make install
+```
+
 1. To generate the `CodeNetPy` dataset see [codenetpy](./codenetpy/)
 
 2. To run the repair pipeline see [repair-pipeline](./repair-pipeline/)
 
 3. To generate the `BugNet` dataset see [bugnet](./bugnet/)
+
+4. To visualize the results of `Codex` on the `BugNet` dataset see [codex](./codex/)
+

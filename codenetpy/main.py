@@ -17,7 +17,8 @@ tqdm.pandas()
 
 P = 8
 
-input_path = "../input/"
+dir_path = os.path.dirname(os.path.abspath(__file__))
+input_path = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "input")
 root_path = input_path + "Project_CodeNet/"
 generated_path = input_path + "codenetpy/"
 

@@ -46,3 +46,9 @@ if there was one.
 
 CodeNet: A Large-Scale AI for Code Dataset for Learning a Diversity of Coding
 Tasks
+
+### Note:
+
+I haven't tested this script, after I moved it and refactor the new ones. So it
+might be broken, but at the same time, the dataset is not that useful, so
+idc...
