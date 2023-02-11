@@ -55,6 +55,8 @@ Since the bug repair task is very similar to a neural machine translation
 problem we have decided to also use CodeT5 for this phase too. We have used the
 same pretrained weights as for the bug detection task and we have fine tuned
 the model to be able to predict accepted source code from buggy source code.
-The model input consists of the error description and the buggy source code and
-will output a modified version of the original source code which should be able
-to be accepted in the competition.
+The model input consists of the error description and the buggy source code.
+Based on the bug localization results, we replace the source code that is
+labeled as buggy with a `<MASK>` token and we train the T5 model to predict
+only the replacement for that part. This is an upgrade to what we did in the
+past, where we tried to generate the entire source code from scratch.
