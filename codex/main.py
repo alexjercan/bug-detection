@@ -107,11 +107,46 @@ def compute_codex_accuracy(submission_pairs_df: pd.DataFrame) -> pd.DataFrame:
     codex_df = submission_pairs_df.copy()
     codex_df["correct"] = line_str == codex_line_str
 
+    def get_bug_type(row: pd.Series) -> str:
+        line = row["changed_src"].splitlines()[row["line"]]
+        language = row["language"]
+
+        if language == "Python":
+            return (
+                "input"
+                if "input" in line
+                else "output"
+                if "print" in line
+                else "algorithm"
+            )
+
+        if language == "C++":
+            return (
+                "input"
+                if ("cin" in line or "scanf" in line)
+                else "output"
+                if ("cout" in line or "printf" in line)
+                else "algorithm"
+            )
+
+        raise NotImplementedError(f"{language} not implemented yet")
+
+    codex_df["type"] = submission_pairs_df.apply(get_bug_type, axis="columns")
+
     return codex_df
 
 
 def display_codex_accuracy(codex_df: pd.DataFrame):
     codex_lang_df = codex_df.groupby("language")["correct"].agg(["sum", "count"])
+    codex_lang_df["accuracy"] = codex_lang_df["sum"] / codex_lang_df["count"]
+
+    print(codex_lang_df[["accuracy"]])
+
+
+def display_codex_accuracy_by_type(codex_df: pd.DataFrame):
+    codex_lang_df = codex_df.groupby(["language", "type"])["correct"].agg(
+        ["sum", "count"]
+    )
     codex_lang_df["accuracy"] = codex_lang_df["sum"] / codex_lang_df["count"]
 
     print(codex_lang_df[["accuracy"]])
@@ -161,3 +196,4 @@ if __name__ == "__main__":
     codex_df = generate_codex_results(submission_pairs_df)
     codex_df = compute_codex_accuracy(codex_df)
     display_codex_accuracy(codex_df)
+    display_codex_accuracy_by_type(codex_df)
