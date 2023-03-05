@@ -42,4 +42,8 @@ Tasks
 
 ## Limitations
 
-- The problem p02974 is causing the script to crash on my pc because of OOM
+- The problem p02974 is causing the script to crash on my pc because of OOM.
+  This happens because `black` cannot handle the `s237078692` submission. The
+  user that made the solution was very smart and created a 400K file. This is
+  the funny file `Project_CodeNet/data/p02974/Python/s237078692.py` for anyone
+  that is curious.

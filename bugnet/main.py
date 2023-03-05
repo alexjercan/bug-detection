@@ -325,6 +325,10 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                     f"Checking submission {id2submission(problem_id, language, original_id)}"
                 )
 
+                if original_id == "s237078692":
+                    LOGGER.debug("You are so smart aren't you mister...")
+                    continue
+
                 # Check if status is non-Accepted -> Accepted; otherwise skip
                 original_status = submission_df.loc[original_id, "status"]
                 changed_status = submission_df.loc[changed_id, "status"]
