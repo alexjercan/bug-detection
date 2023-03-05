@@ -93,7 +93,9 @@ def read_format_submission(
     raise NotImplementedError(f"{language} not implemented yet")
 
 
-def line_diff_checker(original_src: str, changed_src: str) -> Optional[Tuple[str, int]]:
+def line_diff_checker(
+    original_src: str, changed_src: str
+) -> Optional[Tuple[str, int, int, int, int]]:
     original_src_lines = original_src.splitlines()
     changed_src_lines = changed_src.splitlines()
 
@@ -102,11 +104,22 @@ def line_diff_checker(original_src: str, changed_src: str) -> Optional[Tuple[str
     if len(changes) != 1:
         return None
 
-    change, i1, i2, j1, j2 = changes[0]
+    _, i1, i2, j1, j2 = changes[0]
     if i2 - i1 > 1 or j2 - j1 > 1:
         return None
 
-    return change, i1
+    return changes[0]
+
+
+def chunk_diff_checker(
+    original_src: str, changed_src: str
+) -> Optional[Tuple[str, int, int, int, int]]:
+    opcodes = SequenceMatcher(None, original_src, changed_src).get_opcodes()
+    changes = list(filter(lambda opcode: opcode[0] != "equal", opcodes))
+    if len(changes) != 1:
+        return None
+
+    return changes[0]
 
 
 def linter_check_submission(problem_id: str, language: str, submission_id: str) -> bool:
@@ -272,7 +285,10 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
         "original_src",
         "changed_src",
         "change",
-        "line",
+        "i1",
+        "i2",
+        "j1",
+        "j2",
         "error",
     ]
     dfs = []
@@ -327,10 +343,13 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
 
                 # Check if there is only one line changed between the original
                 # and the changed src; otherwise skip
-                diff = line_diff_checker(original_format_src, changed_format_src)
+                # diff = line_diff_checker(original_format_src, changed_format_src)
+                # Check if there is only one chunk changed between the original
+                # and the changed src; otherwise skip
+                diff = chunk_diff_checker(original_format_src, changed_format_src)
                 if diff is None:
                     continue
-                change, line = diff
+                change, i1, i2, j1, j2 = diff
 
                 # Check with linter the original source code; if dumb code skip
                 original_ok = linter_check_submission(problem_id, language, original_id)
@@ -362,7 +381,10 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                         original_format_src,
                         changed_format_src,
                         change,
-                        line,
+                        i1,
+                        i2,
+                        j1,
+                        j2,
                         error,
                     )
                 )

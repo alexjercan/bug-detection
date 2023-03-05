@@ -35,7 +35,11 @@ only on bugs that cannot be identified easily.
 
 This is still WIP.
 
-### Acknowledgements
+## Acknowledgements
 
 CodeNet: A Large-Scale AI for Code Dataset for Learning a Diversity of Coding
 Tasks
+
+## Limitations
+
+- The problem p02974 is causing the script to crash on my pc because of OOM
