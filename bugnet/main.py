@@ -122,6 +122,20 @@ def chunk_diff_checker(
     return changes[0]
 
 
+def lines_diff_checker(
+    original_src: str, changed_src: str
+) -> Optional[Tuple[str, int, int, int, int]]:
+    original_src_lines = original_src.splitlines()
+    changed_src_lines = changed_src.splitlines()
+
+    opcodes = SequenceMatcher(None, original_src_lines, changed_src_lines).get_opcodes()
+    changes = list(filter(lambda opcode: opcode[0] != "equal", opcodes))
+    if len(changes) != 1:
+        return None
+
+    return changes[0]
+
+
 def linter_check_submission(problem_id: str, language: str, submission_id: str) -> bool:
     path = id2submission(problem_id, language, submission_id)
 
@@ -350,7 +364,12 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                 # diff = line_diff_checker(original_format_src, changed_format_src)
                 # Check if there is only one chunk changed between the original
                 # and the changed src; otherwise skip
-                diff = chunk_diff_checker(original_format_src, changed_format_src)
+                # diff = chunk_diff_checker(original_format_src, changed_format_src)
+                # if diff is None:
+                #     continue
+                # Check if there is only one chunk of lines changed between the
+                # original and the changed src; otherwise skip
+                diff = lines_diff_checker(original_format_src, changed_format_src)
                 if diff is None:
                     continue
                 change, i1, i2, j1, j2 = diff
