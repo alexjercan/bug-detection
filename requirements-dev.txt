@@ -1,6 +1,4 @@
 -r requirements.txt
-black==22.12.0
+black==23.1.0
 flake8==6.0.0
-isort==5.11.4
-python-lsp-server==1.7.1
-safety==2.3.5
+isort==5.12.0

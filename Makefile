@@ -14,9 +14,6 @@ format: ## Format
 lint: ## Lint
 	python -m flake8 ./codenetpy ./bugnet ./repair-pipeline ./codex
 
-test.safety: ## Check for dependencies security breach with safety
-	python -m safety check
-
 codenetpy: ## CodeNetPy
 	python codenetpy/main.py
 
