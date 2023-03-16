@@ -544,7 +544,10 @@ def generate_labels_codenet(force: bool = False):
     with tqdm(total=len(errs_df)) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=P) as executor:
             future_to_problem_id = {
-                executor.submit(generate_labels_task, *row,): row[
+                executor.submit(
+                    generate_labels_task,
+                    *row,
+                ): row[
                     [
                         "original_id",
                         "changed_id",
