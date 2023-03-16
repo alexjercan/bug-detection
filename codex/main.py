@@ -20,22 +20,16 @@ LOG_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "cod
 GENERATED_PATH = os.path.join(INPUT_PATH, "bugnet")
 
 
-def make_codex_prompt(source: str, language: str, line: int) -> str:
-    if language == "C++":
-        comment = "//"
-    elif language == "Python":
-        comment = "#"
-    else:
-        raise NotImplementedError(f"{language} not implemented yet")
+def make_codex_prompt(pairs_df: pd.DataFrame, source: str, count: int = 5) -> str:
+    pairs_df = pairs_df.iloc[:count]
 
-    lines = source.splitlines()
-    lines[line] = f"{lines[line]} {comment} Fixme"
-    lines.append(
-        f"{comment} Q: Propose a fix for the buggy line of code, using a single line of {language} code"
-    )
-    lines.append(f"{comment} A:")
+    result = ""
+    for pair_id, row in pairs_df.iterrows():
+        result = result + row["original_src"] + "\n\n" + row["changed_src"] + "\n\n"
 
-    return "\n".join(lines)
+    result = result + source + "\n"
+
+    return result
 
 
 def generate_codex_results(
@@ -48,15 +42,19 @@ def generate_codex_results(
         return pd.read_csv(codex_results_path, keep_default_na=False)
 
     # Cut down from the number of examples
-    submission_pairs_df = submission_pairs_df.groupby("language").head(10)
+    pairs_df = submission_pairs_df.groupby("language").head(100)
 
     results = []
-    with tqdm(total=len(submission_pairs_df)) as pbar:
-        for pair_id, row in submission_pairs_df.iterrows():
+    with tqdm(total=len(pairs_df)) as pbar:
+        for pair_id, row in pairs_df.iterrows():
             try:
-                prompt = make_codex_prompt(
-                    row["original_src"], row["language"], row["line"]
-                )
+                pairs_df = submission_pairs_df[
+                    (submission_pairs_df["language"] == row["language"])
+                    & (submission_pairs_df.index != pair_id)
+                ]
+                prompt = make_codex_prompt(pairs_df, row["original_src"])
+                print(prompt)
+                exit()
                 response = openai.Completion.create(
                     model="code-davinci-002",
                     prompt=prompt,
@@ -78,7 +76,7 @@ def generate_codex_results(
 
     results = pd.DataFrame(results, columns=["index", "codex_predicted"])
     results.set_index("index", inplace=True)
-    submission_pairs_df = submission_pairs_df.join(results)
+    submission_pairs_df = submission_pairs_df.join(results, how="inner")
     submission_pairs_df["codex_predicted"] = submission_pairs_df[
         "codex_predicted"
     ].astype(str)
@@ -89,26 +87,11 @@ def generate_codex_results(
 
 
 def compute_codex_accuracy(submission_pairs_df: pd.DataFrame) -> pd.DataFrame:
-    line_str = submission_pairs_df.apply(
-        lambda row: row["changed_src"].splitlines()[row["line"]], axis="columns"
-    )
-
-    def codex_to_line_str(codex_predicted: str) -> str:
-        codex_predicted = codex_predicted.strip()
-        codex_lines = codex_predicted.splitlines()
-        if len(codex_lines) > 0:
-            codex_predicted = codex_lines[0]
-        return codex_predicted
-
-    codex_line_str = submission_pairs_df.apply(
-        lambda row: codex_to_line_str(str(row["codex_predicted"])), axis="columns"
-    )
-
     codex_df = submission_pairs_df.copy()
-    codex_df["correct"] = line_str == codex_line_str
+    codex_df["correct"] = codex_df["codex_predicted"] == codex_df["changed_src"]
 
     def get_bug_type(row: pd.Series) -> str:
-        line = row["changed_src"].splitlines()[row["line"]]
+        line = "\n".join(row["changed_src"].splitlines()[row["j1"]:row["j2"]])
         language = row["language"]
 
         if language == "Python":
@@ -131,7 +114,7 @@ def compute_codex_accuracy(submission_pairs_df: pd.DataFrame) -> pd.DataFrame:
 
         raise NotImplementedError(f"{language} not implemented yet")
 
-    codex_df["type"] = submission_pairs_df.apply(get_bug_type, axis="columns")
+    codex_df["type"] = codex_df.apply(get_bug_type, axis="columns")
 
     return codex_df
 
