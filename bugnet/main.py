@@ -234,10 +234,10 @@ def codenet_download_data(force: bool = False) -> None:
         return
 
     if not os.path.exists(tar_path) or force:
-        LOGGER.debug(f"download dataset from {data_url}/{tar_name}")
+        LOGGER.info(f"download dataset from {data_url}/{tar_name}")
         wget.download(f"{data_url}/{tar_name}", out=tar_path)
 
-    LOGGER.debug(f"extract codenet to {INPUT_PATH}")
+    LOGGER.info(f"extract codenet to {INPUT_PATH}")
     result = subprocess.run(
         f"tar -xzvf {tar_path} -C {INPUT_PATH}",
         capture_output=True,
@@ -246,7 +246,7 @@ def codenet_download_data(force: bool = False) -> None:
         errors="ignore",
     )
 
-    LOGGER.debug(f"process finished with status {result.returncode}")
+    LOGGER.info(f"process finished with status {result.returncode}")
 
 
 def codenet_filter_problems(force: bool = False) -> pd.DataFrame:
@@ -261,7 +261,7 @@ def codenet_filter_problems(force: bool = False) -> pd.DataFrame:
         return pd.read_csv(out_file_path, index_col="id")
 
     file_path = os.path.join(META_PATH, "problem_list.csv")
-    LOGGER.debug(f"cleaning {file_path}")
+    LOGGER.info(f"cleaning {file_path}")
 
     problem_list_df = pd.read_csv(file_path, index_col="id")
 
@@ -285,7 +285,7 @@ def codenet_filter_problems(force: bool = False) -> pd.DataFrame:
     LOGGER.debug("drop rating, targs and complexity")
     problem_list_df.drop(["rating", "tags", "complexity"], axis="columns", inplace=True)
 
-    LOGGER.debug(f"save to {out_file_path}")
+    LOGGER.info(f"save to {out_file_path}")
     problem_list_df.to_csv(out_file_path)
 
     return problem_list_df
