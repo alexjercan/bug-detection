@@ -108,7 +108,7 @@ def generate_codex_results(
         return pd.read_csv(codex_results_path, keep_default_na=False)
 
     # Cut down from the number of examples
-    pairs_df = submission_pairs_df.groupby("language").head(100)
+    pairs_df = submission_pairs_df.groupby("language").head(500)
 
     results = []
     with tqdm(total=len(pairs_df)) as pbar:
