@@ -86,7 +86,24 @@ def execute_source(
     raise NotImplementedError(f"{language} not implemented yet")
 
 
-def make_codex_prompt(pairs_df: pd.DataFrame, source: str, count: int = 5) -> str:
+def make_codex_prompt_simple(source: str, language: str) -> str:
+    if language == "C++":
+        comment = "//"
+    elif language == "Python":
+        comment = "#"
+    else:
+        raise NotImplementedError(f"{language} not implemented yet")
+
+    lines = source.splitlines()
+    lines.append(
+        f"{comment} Propose code to fix the bug"
+    )
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def make_codex_prompt_multishot(pairs_df: pd.DataFrame, source: str, count: int = 5) -> str:
     pairs_df = pairs_df.iloc[:count]
 
     result = ""
@@ -108,18 +125,13 @@ def generate_codex_results(
         return pd.read_csv(codex_results_path, keep_default_na=False)
 
     # Cut down from the number of examples
-    pairs_df = submission_pairs_df.groupby("language").head(500)
+    pairs_df = submission_pairs_df.groupby("language").head(100)
 
     results = []
     with tqdm(total=len(pairs_df)) as pbar:
         for pair_id, row in pairs_df.iterrows():
             try:
-                pairs_df = submission_pairs_df[
-                    (submission_pairs_df["language"] == row["language"])
-                    & (submission_pairs_df.index != pair_id)
-                ]
-
-                prompt = make_codex_prompt(pairs_df, row["original_src"])
+                prompt = make_codex_prompt_simple(row["original_src"], row["language"])
                 response = openai.Completion.create(
                     model="code-davinci-002",
                     prompt=prompt,
