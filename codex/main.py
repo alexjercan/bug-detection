@@ -133,7 +133,7 @@ def generate_codex_results(
             try:
                 prompt = make_codex_prompt_simple(row["original_src"], row["language"])
                 response = openai.Completion.create(
-                    model="code-davinci-002",
+                    model="text-davinci-003",
                     prompt=prompt,
                     temperature=0.5,
                     max_tokens=256,
