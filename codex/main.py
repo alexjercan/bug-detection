@@ -95,15 +95,15 @@ def make_codex_prompt_simple(source: str, language: str) -> str:
         raise NotImplementedError(f"{language} not implemented yet")
 
     lines = source.splitlines()
-    lines.append(
-        f"{comment} Propose code to fix the bug"
-    )
+    lines.append(f"{comment} Propose code to fix the bug")
     lines.append("")
 
     return "\n".join(lines)
 
 
-def make_codex_prompt_multishot(pairs_df: pd.DataFrame, source: str, count: int = 5) -> str:
+def make_codex_prompt_multishot(
+    pairs_df: pd.DataFrame, source: str, count: int = 5
+) -> str:
     pairs_df = pairs_df.iloc[:count]
 
     result = ""
@@ -223,7 +223,9 @@ def display_codex_accuracy_exact(codex_df: pd.DataFrame):
 
 
 def display_codex_accuracy_execute(codex_df: pd.DataFrame):
-    codex_lang_df = codex_df.groupby("language")["correct_execute"].agg(["sum", "count"])
+    codex_lang_df = codex_df.groupby("language")["correct_execute"].agg(
+        ["sum", "count"]
+    )
     codex_lang_df["accuracy"] = codex_lang_df["sum"] / codex_lang_df["count"]
 
     print("Execute accuracy")
