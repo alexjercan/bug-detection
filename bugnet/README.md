@@ -51,6 +51,19 @@ The resulting dataset file will be a csv with the following columns:
 - `j2`: End of the change in the accepted source
 - `error`: The error that was obtained running the buggy source code on the input/output examples
 
+## Dependencies
+
+To be able to generate the dataset you will require C++ and Python tools.
+
+- `g++`: g++ (Ubuntu 12.2.0-3ubuntu1) 12.2.0
+- `clang-tidy`: Ubuntu LLVM version 15.0.6
+- `clang-format`: Ubuntu clang-format version 15.0.6
+- `Python`: Python 3.10.7
+- `black`: black, 23.1.0 (compiled: yes)
+- `flake8`: 6.0.0 (mccabe: 0.7.0, pycodestyle: 2.10.0, pyflakes: 3.0.1) CPython 3.10.7 on Linux
+
+These are the tools that are required. The scipt should work with newer versions aswell.
+
 ## Acknowledgements
 
 CodeNet: A Large-Scale AI for Code Dataset for Learning a Diversity of Coding
