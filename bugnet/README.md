@@ -50,6 +50,7 @@ The resulting dataset file will be a csv with the following columns:
 - `j1`: Start of the change in the accepted source
 - `j2`: End of the change in the accepted source
 - `error`: The error that was obtained running the buggy source code on the input/output examples
+- `stderr`: The full output of stderr of running the buggy source code on the input/output examples
 
 ## Dependencies
 
