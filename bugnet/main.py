@@ -169,7 +169,7 @@ def execute_source(
     input: str,
     output: str,
     timeout: Optional[float] = None,
-) -> Optional[str]:
+) -> Optional[Tuple[str, str]]:
     path = id2submission(problem_id, language, submission_id)
 
     if language == "C++":
@@ -190,9 +190,9 @@ def execute_source(
                     resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY)
                 ),
             )
-            return str(result.returncode)
+            return str(result.returncode), str(result.stderr)
         except subprocess.TimeoutExpired:
-            return "TLE"
+            return "TLE", ""
     if language == "Python":
         try:
             result = subprocess.run(
@@ -208,18 +208,33 @@ def execute_source(
             )
             rs = "|".join(
                 [
-                    r"^(\w*Error):.*",
-                    r"(\w*Warning):.*",
+                    r"^(\w*Error:.*).*",
+                    r"^(\w*Warning:.*).*",
                 ]
             )
-
             p_class = re.compile(rs, re.MULTILINE)
             error_class = p_class.findall(result.stderr)
-            if not error_class:
-                return str(result.returncode)
-            return functools.reduce(lambda acc, x: acc or x, error_class[0], None)
+            if error_class:
+                return functools.reduce(
+                    lambda acc, x: acc or x, error_class[0], None
+                ), str(result.stderr)
+
+            rs = "|".join(
+                [
+                    r"^(\w*Error):.*",
+                    r"^(\w*Warning):.*",
+                ]
+            )
+            p_class = re.compile(rs, re.MULTILINE)
+            error_class = p_class.findall(result.stderr)
+            if error_class:
+                return functools.reduce(
+                    lambda acc, x: acc or x, error_class[0], None
+                ), str(result.stderr)
+
+            return str(result.returncode), str(result.stderr)
         except subprocess.TimeoutExpired:
-            return "TLE"
+            return "TLE", ""
 
     raise NotImplementedError(f"{language} not implemented yet")
 
@@ -304,6 +319,7 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
         "j1",
         "j2",
         "error",
+        "stderr",
     ]
     dfs = []
 
@@ -382,15 +398,17 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                 # Check and get the error annotations. If the original status
                 # is MLE we will trust it :) because my pc crashes
                 if original_status == "Memory Limit Exceeded":
-                    error = "MLE"
+                    error = "MLE", ""
                 elif original_status == "Time Limit Exceeded":
-                    error = "TLE"
+                    error = "TLE", ""
                 else:
                     error = execute_source(
                         problem_id, language, original_id, input, output, timeout=2.0
                     )
                 if error is None:
                     continue
+
+                error, stderr = error
 
                 LOGGER.debug(
                     f"Added {id2submission(problem_id, language, original_id)} to csv"
@@ -409,6 +427,7 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                         j1,
                         j2,
                         error,
+                        stderr,
                     )
                 )
 
