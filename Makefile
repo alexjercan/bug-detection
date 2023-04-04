@@ -8,11 +8,11 @@ install: ## Install dependencies
 	pip install -r requirements-dev.txt --upgrade --no-warn-script-location
 
 format: ## Format
-	python -m isort ./codenetpy ./bugnet ./repair-pipeline ./codex --skip .venv/
-	python -m black ./codenetpy ./bugnet ./repair-pipeline ./codex --exclude .venv/
+	python -m isort ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen --skip .venv/
+	python -m black ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen --exclude .venv/
 
 lint: ## Lint
-	python -m flake8 ./codenetpy ./bugnet ./repair-pipeline ./codex
+	python -m flake8 ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen
 
 codenetpy: ## CodeNetPy
 	python codenetpy/main.py
@@ -22,5 +22,8 @@ bugnet: ## BugNet
 
 codex: ## Codex Experiments
 	python codex/main.py --log info
+
+codegen: ## Codegen Experiments
+	python codegen/main.py --log info
 
 export PYTHONPATH=$PYTHONPATH:src
