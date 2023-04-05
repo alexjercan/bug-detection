@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: install format lint test.safety codenetpy bugnet codex
+.PHONY: install format lint test.safety codenetpy bugnet codex codegen
 
 ### QUICK
 # ¯¯¯¯¯¯¯
@@ -24,6 +24,6 @@ codex: ## Codex Experiments
 	python codex/main.py --log info
 
 codegen: ## Codegen Experiments
-	python codegen/main.py --log info
+	TOKENIZERS_PARALLELISM=false python codegen/main.py --log info
 
 export PYTHONPATH=$PYTHONPATH:src

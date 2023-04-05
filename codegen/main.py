@@ -113,9 +113,9 @@ def make_prompt_multishot(pairs_df: pd.DataFrame, source: str, count: int = 5) -
 
 
 def generate_results(
-    submission_pairs_df: pd.DataFrame, force: bool = False
+    submission_pairs_df: pd.DataFrame, prompt_type: str = "simple", force: bool = False
 ) -> pd.DataFrame:
-    results_path = os.path.join(GENERATED_PATH, "results.csv")
+    results_path = os.path.join(GENERATED_PATH, "codegen_results.csv")
 
     if os.path.exists(results_path) and not force:
         LOGGER.info("codegen results already generated. skiping...")
@@ -134,13 +134,25 @@ def generate_results(
     with tqdm(total=len(pairs_df)) as pbar:
         for pair_id, row in pairs_df.iterrows():
             try:
-                prompt = make_prompt_simple(row["original_src"], row["language"])
+                if prompt_type == "simple":
+                    prompt = make_prompt_simple(row["original_src"], row["language"])
+                    max_length = 512
+                elif prompt_type == "multishot":
+                    pairs_df = submission_pairs_df[
+                        (submission_pairs_df["language"] == row["language"])
+                        & (submission_pairs_df.index != pair_id)
+                    ]
+                    prompt = make_prompt_multishot(
+                        pairs_df, row["original_src"], count=3
+                    )
+                    max_length = 2048
 
                 inputs = tokenizer(prompt, return_tensors="pt").to(device)
-                sample = model.generate(**inputs, max_length=128)
-                result = tokenizer.decode(
-                    sample[0], truncate_before_pattern=[r"\n\n^#", "^'''", "\n\n\n"]
+                sample = model.generate(
+                    **inputs, max_length=max_length, pad_token_id=tokenizer.eos_token_id
                 )
+                result = tokenizer.decode(sample[0])
+                result = result.removeprefix(prompt)
 
                 with open(
                     id2inout(row["problem_id"], name="input"), "r", encoding="utf-8"
@@ -266,7 +278,16 @@ if __name__ == "__main__":
         choices=list(levels.keys()),
         help="Provide logging level. Example --loglevel debug, default=warning",
     )
+    parser.add_argument(
+        "-t",
+        "--type",
+        default="multishot",
+        choices=["simple", "multishot"],
+        help="Provide the type of prompting.",
+    )
     args = parser.parse_args()
+
+    prompt_type = args.type
 
     LOGGER.addHandler(logging.StreamHandler())
     LOGGER.addHandler(logging.FileHandler(os.getenv("LOG_FILE", LOG_PATH)))
@@ -288,7 +309,7 @@ if __name__ == "__main__":
 
     submission_pairs_df = pd.read_csv(generated_pairs_path, keep_default_na=False)
 
-    results_df = generate_results(submission_pairs_df)
+    results_df = generate_results(submission_pairs_df, prompt_type=prompt_type)
     results_df = compute_accuracy(results_df)
     display_accuracy_exact(results_df)
     display_accuracy_execute(results_df)
