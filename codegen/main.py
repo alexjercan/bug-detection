@@ -26,6 +26,9 @@ ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DERIVED_PATH = os.path.join(ROOT_PATH, "derived")
 GENERATED_PATH = os.path.join(INPUT_PATH, "bugnet")
 
+PROMPT_SIMPLE = "simple"
+PROMPT_MULTISHOT = "multishot"
+
 
 def id2inout(problem_id: str, name: str = "input") -> str:
     return os.path.join(DERIVED_PATH, "input_output", "data", problem_id, f"{name}.txt")
@@ -113,7 +116,9 @@ def make_prompt_multishot(pairs_df: pd.DataFrame, source: str, count: int = 5) -
 
 
 def generate_results(
-    submission_pairs_df: pd.DataFrame, prompt_type: str = "simple", force: bool = False
+    submission_pairs_df: pd.DataFrame,
+    prompt_type: str = PROMPT_SIMPLE,
+    force: bool = False,
 ) -> pd.DataFrame:
     results_path = os.path.join(GENERATED_PATH, "codegen_results.csv")
 
@@ -134,10 +139,10 @@ def generate_results(
     with tqdm(total=len(pairs_df)) as pbar:
         for pair_id, row in pairs_df.iterrows():
             try:
-                if prompt_type == "simple":
+                if prompt_type == PROMPT_SIMPLE:
                     prompt = make_prompt_simple(row["original_src"], row["language"])
                     max_length = 512
-                elif prompt_type == "multishot":
+                elif prompt_type == PROMPT_MULTISHOT:
                     pairs_df = submission_pairs_df[
                         (submission_pairs_df["language"] == row["language"])
                         & (submission_pairs_df.index != pair_id)
@@ -281,8 +286,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "-t",
         "--type",
-        default="multishot",
-        choices=["simple", "multishot"],
+        default=PROMPT_MULTISHOT,
+        choices=[PROMPT_SIMPLE, PROMPT_MULTISHOT],
         help="Provide the type of prompting.",
     )
     args = parser.parse_args()
