@@ -10,7 +10,7 @@ import torch
 import traceback
 import uuid
 from tqdm.auto import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, T5ForConditionalGeneration
 from typing import Optional
 
 LOGGER = logging.getLogger(__name__)
@@ -25,6 +25,9 @@ LOG_PATH = os.path.join(
 ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DERIVED_PATH = os.path.join(ROOT_PATH, "derived")
 GENERATED_PATH = os.path.join(INPUT_PATH, "bugnet")
+
+MODEL_CODEGEN = "codegen"
+MODEL_CODET5 = "codet5"
 
 PROMPT_SIMPLE = "simple"
 PROMPT_MULTISHOT = "multishot"
@@ -118,22 +121,30 @@ def make_prompt_multishot(pairs_df: pd.DataFrame, source: str, count: int = 5) -
 def generate_results(
     submission_pairs_df: pd.DataFrame,
     prompt_type: str = PROMPT_SIMPLE,
+    model_type: str = MODEL_CODEGEN,
     force: bool = False,
 ) -> pd.DataFrame:
-    results_path = os.path.join(GENERATED_PATH, "codegen_results.csv")
+    results_path = os.path.join(GENERATED_PATH, f"{model_type}_results.csv")
 
     if os.path.exists(results_path) and not force:
-        LOGGER.info("codegen results already generated. skiping...")
+        LOGGER.info("%s results already generated. skiping...", model_type)
         return pd.read_csv(results_path, keep_default_na=False)
 
     # Cut down from the number of examples
     pairs_df = submission_pairs_df.groupby("language").head(100)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    tokenizer = AutoTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
-    model = AutoModelForCausalLM.from_pretrained("Salesforce/codegen-350M-mono").to(
-        device
-    )
+
+    if model_type == MODEL_CODEGEN:
+        tokenizer = AutoTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
+        model = AutoModelForCausalLM.from_pretrained("Salesforce/codegen-350M-mono").to(
+            device
+        )
+    elif model_type == MODEL_CODET5:
+        tokenizer = AutoTokenizer.from_pretrained("Salesforce/codet5-base")
+        model = T5ForConditionalGeneration.from_pretrained("Salesforce/codet5-base").to(
+            device
+        )
 
     results = []
     with tqdm(total=len(pairs_df)) as pbar:
@@ -290,9 +301,17 @@ if __name__ == "__main__":
         choices=[PROMPT_SIMPLE, PROMPT_MULTISHOT],
         help="Provide the type of prompting.",
     )
+    parser.add_argument(
+        "-m",
+        "--model",
+        default=MODEL_CODEGEN,
+        choices=[MODEL_CODEGEN, MODEL_CODET5],
+        help="Provide the model to use.",
+    )
     args = parser.parse_args()
 
     prompt_type = args.type
+    model_type = args.model
 
     LOGGER.addHandler(logging.StreamHandler())
     LOGGER.addHandler(logging.FileHandler(os.getenv("LOG_FILE", LOG_PATH)))
@@ -314,7 +333,9 @@ if __name__ == "__main__":
 
     submission_pairs_df = pd.read_csv(generated_pairs_path, keep_default_na=False)
 
-    results_df = generate_results(submission_pairs_df, prompt_type=prompt_type)
+    results_df = generate_results(
+        submission_pairs_df, prompt_type=prompt_type, model_type=model_type
+    )
     results_df = compute_accuracy(results_df)
     display_accuracy_exact(results_df)
     display_accuracy_execute(results_df)

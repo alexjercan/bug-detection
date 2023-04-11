@@ -24,6 +24,9 @@ codex: ## Codex Experiments
 	python codex/main.py --log info
 
 codegen: ## Codegen Experiments
-	TOKENIZERS_PARALLELISM=false python codegen/main.py --log info
+	TOKENIZERS_PARALLELISM=false python codegen/main.py --model codegen --log info
+
+codet5: ## CodeT5 Experiments
+	TOKENIZERS_PARALLELISM=false python codegen/main.py --model codet5 --log info
 
 export PYTHONPATH=$PYTHONPATH:src
