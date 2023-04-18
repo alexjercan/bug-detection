@@ -34,3 +34,5 @@ make install
 4. To visualize the results of `Codex` on the `BugNet` dataset see [codex](./codex/)
 
 5. To visualize the results of the `CodeGen` model on the `BugNet` dataset see [codegen](./codegen/)
+
+6. To visualize the results of the description generation on the `BugNet` dataset see [description](./description//)
