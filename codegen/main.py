@@ -141,10 +141,12 @@ def generate_results(
             device
         )
     elif model_type == MODEL_CODET5:
-        tokenizer = AutoTokenizer.from_pretrained("Salesforce/codet5-base")
-        model = T5ForConditionalGeneration.from_pretrained("Salesforce/codet5-base").to(
-            device
+        tokenizer = AutoTokenizer.from_pretrained(
+            "alexjercan/codet5-base-buggy-code-repair"
         )
+        model = T5ForConditionalGeneration.from_pretrained(
+            "alexjercan/codet5-base-buggy-code-repair"
+        ).to(device)
 
     results = []
     with tqdm(total=len(pairs_df)) as pbar:
