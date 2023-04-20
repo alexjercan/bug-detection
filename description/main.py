@@ -11,7 +11,7 @@ import torch
 import traceback
 import uuid
 from tqdm.auto import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Tokenizer, GPT2LMHeadModel,OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 from typing import Optional
 
 LOGGER = logging.getLogger(__name__)
@@ -28,8 +28,10 @@ GENERATED_PATH = os.path.join(INPUT_PATH, "bugnet")
 MODEL_TEXT_DAVINCI_003 = "text-davinci-003"
 MODEL_CODEGEN = "codegen"
 MODEL_OPENAIGPT = "openai-gpt"
+MODEL_GPT2 = "gpt2"
 
 PROMPT_SIMPLE = "simple"
+PROMPT_MULTISHOT = "multishot"
 
 
 def make_prompt_simple(source: str) -> str:
@@ -40,6 +42,23 @@ def make_prompt_simple(source: str) -> str:
     lines.append("```")
 
     return "\n".join(lines)
+
+
+def make_prompt_multishot(
+    pairs_df: pd.DataFrame, source_id: int, source_row: pd.Series, count: int = 5
+) -> str:
+    pairs_df = pairs_df[
+        (pairs_df["language"] == source_row["language"]) & (pairs_df.index != source_id)
+    ]
+    pairs_df = pairs_df.iloc[:count]
+
+    result = ""
+    for _, row in pairs_df.iterrows():
+        result = result + row["original_src"] + "\n\n" + row["error"] + "\n\n"
+
+    result = result + source_row["original_src"] + "\n"
+
+    return result
 
 
 def generate_results(
@@ -55,12 +74,17 @@ def generate_results(
         return pd.read_csv(results_path, keep_default_na=False)
 
     # Cut down from the number of examples
-    pairs_df = submission_pairs_df.groupby("language").head(5)
+    pairs_df = submission_pairs_df.groupby("language").head(10)
 
     if prompt_type == PROMPT_SIMPLE:
 
-        def prompt_fn(row: pd.Series) -> str:
+        def prompt_fn(_: int, row: pd.Series) -> str:
             return make_prompt_simple(row["original_src"])
+
+    elif prompt_type == PROMPT_MULTISHOT:
+
+        def prompt_fn(row_id: int, row: pd.Series) -> str:
+            return make_prompt_multishot(pairs_df, row_id, row, count=5)
 
     else:
         raise NotImplementedError(f"{prompt_type} is not implemented yet")
@@ -101,13 +125,33 @@ def generate_results(
 
     elif model_type == MODEL_OPENAIGPT:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        generator = pipeline("text-generation", model="openai-gpt")
+        tokenizer = OpenAIGPTTokenizer.from_pretrained("openai-gpt")
+        model = OpenAIGPTLMHeadModel.from_pretrained("openai-gpt")
         max_length = 512
 
         def result_fn(prompt: str) -> str:
-            result = generator(prompt, max_length=max_length, num_return_sequences=1)[0][
-                "generated_text"
-            ]
+            inputs = tokenizer(prompt, return_tensors="pt").to(device)
+            sample = model.generate(
+                **inputs, max_length=max_length, pad_token_id=tokenizer.eos_token_id
+            )
+            result = tokenizer.decode(sample[0])
+            result = result.removeprefix(prompt)
+            return result
+
+    elif model_type == MODEL_GPT2:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        model = GPT2LMHeadModel.from_pretrained('gpt2').to(
+            device
+        )
+        max_length = 512
+
+        def result_fn(prompt: str) -> str:
+            inputs = tokenizer(prompt, return_tensors="pt").to(device)
+            sample = model.generate(
+                **inputs, max_length=max_length, pad_token_id=tokenizer.eos_token_id
+            )
+            result = tokenizer.decode(sample[0])
             result = result.removeprefix(prompt)
             return result
 
@@ -118,7 +162,7 @@ def generate_results(
     with tqdm(total=len(pairs_df)) as pbar:
         for pair_id, row in pairs_df.iterrows():
             try:
-                prompt = prompt_fn(row)
+                prompt = prompt_fn(pair_id, row)
                 result = result_fn(prompt)
                 results.append((pair_id, result))
             except Exception as exc:
@@ -163,14 +207,14 @@ if __name__ == "__main__":
         "-t",
         "--type",
         default=PROMPT_SIMPLE,
-        choices=[PROMPT_SIMPLE],
+        choices=[PROMPT_SIMPLE, PROMPT_MULTISHOT],
         help="Provide the type of prompting.",
     )
     parser.add_argument(
         "-m",
         "--model",
         default=MODEL_OPENAIGPT,
-        choices=[MODEL_TEXT_DAVINCI_003, MODEL_CODEGEN, MODEL_OPENAIGPT],
+        choices=[MODEL_TEXT_DAVINCI_003, MODEL_CODEGEN, MODEL_OPENAIGPT, MODEL_GPT2],
         help="Provide the model to use.",
     )
     args = parser.parse_args()

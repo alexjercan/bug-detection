@@ -30,6 +30,6 @@ codet5: ## CodeT5 Experiments
 	TOKENIZERS_PARALLELISM=false python codegen/main.py --model codet5 --log info
 
 description: ## Let ChatGPT generate descriptions
-	TOKENIZERS_PARALLELISM=false python description/main.py --model openai-gpt --log info
+	TOKENIZERS_PARALLELISM=false python description/main.py --log info
 
 export PYTHONPATH=$PYTHONPATH:src
