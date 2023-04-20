@@ -11,7 +11,14 @@ import torch
 import traceback
 import uuid
 from tqdm.auto import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Tokenizer, GPT2LMHeadModel,OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    GPT2LMHeadModel,
+    GPT2Tokenizer,
+    OpenAIGPTLMHeadModel,
+    OpenAIGPTTokenizer,
+)
 from typing import Optional
 
 LOGGER = logging.getLogger(__name__)
@@ -140,10 +147,8 @@ def generate_results(
 
     elif model_type == MODEL_GPT2:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        model = GPT2LMHeadModel.from_pretrained('gpt2').to(
-            device
-        )
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        model = GPT2LMHeadModel.from_pretrained("gpt2").to(device)
         max_length = 512
 
         def result_fn(prompt: str) -> str:
