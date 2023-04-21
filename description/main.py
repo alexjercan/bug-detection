@@ -2,14 +2,17 @@ import logging
 import os
 
 import argparse
+import numpy as np
 import openai
 import pandas as pd
+import pickle
 import resource
 import subprocess
 import time
 import torch
 import traceback
 import uuid
+from pathlib import Path
 from tqdm.auto import tqdm
 from transformers import (
     AutoModelForCausalLM,
@@ -19,7 +22,7 @@ from transformers import (
     OpenAIGPTLMHeadModel,
     OpenAIGPTTokenizer,
 )
-from typing import Optional
+from typing import List, Tuple
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,7 +76,7 @@ def generate_results(
     prompt_type: str = PROMPT_SIMPLE,
     model_type: str = MODEL_TEXT_DAVINCI_003,
     force: bool = False,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, List[List[torch.Tensor]]]:
     results_path = os.path.join(GENERATED_PATH, f"{model_type}_description_results.csv")
 
     if os.path.exists(results_path) and not force:
@@ -81,7 +84,7 @@ def generate_results(
         return pd.read_csv(results_path, keep_default_na=False)
 
     # Cut down from the number of examples
-    pairs_df = submission_pairs_df.groupby("language").head(10)
+    pairs_df = submission_pairs_df.groupby("language").head(1)
 
     if prompt_type == PROMPT_SIMPLE:
 
@@ -101,7 +104,7 @@ def generate_results(
             os.environ.get("OPENAI_API_KEY") is not None
         ), "You have to provide an api key for openai"
 
-        def result_fn(prompt: str) -> str:
+        def result_fn(prompt: str) -> Tuple[str, List[torch.Tensor]]:
             response = openai.Completion.create(
                 model=model_type,
                 prompt=prompt,
@@ -111,7 +114,7 @@ def generate_results(
             )
             result = response["choices"][0]["text"]
             time.sleep(15)
-            return result
+            return result, None
 
     elif model_type == MODEL_CODEGEN:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -119,57 +122,53 @@ def generate_results(
         model = AutoModelForCausalLM.from_pretrained("Salesforce/codegen-350M-mono").to(
             device
         )
-        max_length = 512
 
-        def result_fn(prompt: str) -> str:
+        def result_fn(prompt: str) -> Tuple[str, List[torch.Tensor]]:
             inputs = tokenizer(prompt, return_tensors="pt").to(device)
-            sample = model.generate(
-                **inputs, max_length=max_length, pad_token_id=tokenizer.eos_token_id
-            )
-            result = tokenizer.decode(sample[0])
+            sample = model(**inputs, output_attentions=True)
+            preds = sample.logits.argmax(dim=2)
+            result = tokenizer.decode(preds[0])
             result = result.removeprefix(prompt)
-            return result
+            return result, sample.attentions
 
     elif model_type == MODEL_OPENAIGPT:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         tokenizer = OpenAIGPTTokenizer.from_pretrained("openai-gpt")
         model = OpenAIGPTLMHeadModel.from_pretrained("openai-gpt")
-        max_length = 512
 
-        def result_fn(prompt: str) -> str:
+        def result_fn(prompt: str) -> Tuple[str, List[torch.Tensor]]:
             inputs = tokenizer(prompt, return_tensors="pt").to(device)
-            sample = model.generate(
-                **inputs, max_length=max_length, pad_token_id=tokenizer.eos_token_id
-            )
-            result = tokenizer.decode(sample[0])
+            sample = model(**inputs, output_attentions=True)
+            preds = sample.logits.argmax(dim=2)
+            result = tokenizer.decode(preds[0])
             result = result.removeprefix(prompt)
-            return result
+            return result, sample.attentions
 
     elif model_type == MODEL_GPT2:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         model = GPT2LMHeadModel.from_pretrained("gpt2").to(device)
-        max_length = 512
 
-        def result_fn(prompt: str) -> str:
+        def result_fn(prompt: str) -> Tuple[str, List[torch.Tensor]]:
             inputs = tokenizer(prompt, return_tensors="pt").to(device)
-            sample = model.generate(
-                **inputs, max_length=max_length, pad_token_id=tokenizer.eos_token_id
-            )
-            result = tokenizer.decode(sample[0])
+            sample = model(**inputs, output_attentions=True)
+            preds = sample.logits.argmax(dim=2)
+            result = tokenizer.decode(preds[0])
             result = result.removeprefix(prompt)
-            return result
+            return result, sample.attentions
 
     else:
         raise NotImplementedError(f"{model_type} is not implemented yet")
 
     results = []
+    attentions_results = []
     with tqdm(total=len(pairs_df)) as pbar:
         for pair_id, row in pairs_df.iterrows():
             try:
                 prompt = prompt_fn(pair_id, row)
-                result = result_fn(prompt)
+                result, attentions = result_fn(prompt)
                 results.append((pair_id, result))
+                attentions_results.append(attentions)
             except Exception as exc:
                 LOGGER.error(
                     f"{pair_id} generated an exception:"
@@ -186,7 +185,11 @@ def generate_results(
 
     submission_pairs_df.to_csv(results_path, index=False)
 
-    return submission_pairs_df
+    results_path = Path(results_path).with_suffix(".pkl")
+    with open(results_path, "wb") as f:
+        pickle.dump(attentions_results, f)
+
+    return submission_pairs_df, attentions_results
 
 
 if __name__ == "__main__":
@@ -218,7 +221,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-m",
         "--model",
-        default=MODEL_OPENAIGPT,
+        default=MODEL_GPT2,
         choices=[MODEL_TEXT_DAVINCI_003, MODEL_CODEGEN, MODEL_OPENAIGPT, MODEL_GPT2],
         help="Provide the model to use.",
     )
@@ -247,7 +250,7 @@ if __name__ == "__main__":
 
     submission_pairs_df = pd.read_csv(generated_pairs_path, keep_default_na=False)
 
-    results_df = generate_results(
+    results_df, _ = generate_results(
         submission_pairs_df, prompt_type=prompt_type, model_type=model_type
     )
 
