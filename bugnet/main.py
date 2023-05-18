@@ -17,6 +17,7 @@ from multiprocessing import cpu_count
 from pathlib import Path
 from tqdm.auto import tqdm
 from typing import Optional, Tuple
+from zipfile import ZipFile
 
 LOGGER = logging.getLogger(__name__)
 
@@ -48,11 +49,16 @@ ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DATA_PATH = os.path.join(ROOT_PATH, "data")
 META_PATH = os.path.join(ROOT_PATH, "metadata")
 DERIVED_PATH = os.path.join(ROOT_PATH, "derived")
+PROBLEM_DESCRIPTIONS_PATH = os.path.join(ROOT_PATH, "problem_descriptions")
 GENERATED_PATH = os.path.join(INPUT_PATH, "bugnet")
 
 
 def id2inout(problem_id: str, name: str = "input") -> str:
     return os.path.join(DERIVED_PATH, "input_output", "data", problem_id, f"{name}.txt")
+
+
+def id2desc(problem_id: str) -> str:
+    return os.path.join(PROBLEM_DESCRIPTIONS_PATH, problem_id + ".html")
 
 
 def id2submission(
@@ -459,7 +465,7 @@ def codenet_submission_pairs(
             try:
                 xs.append(pd.read_csv(path))
             except Exception as exc:
-                LOGGER.warn(
+                LOGGER.warning(
                     f"{path} generated an exception:"
                     + f"{exc}\ntraceback:\n{traceback.format_exc()}"
                 )
@@ -502,6 +508,74 @@ def codenet_submission_pairs(
     return df
 
 
+def codenet_problem_statements(problem_list_df: pd.DataFrame, force: bool = False):
+    problem_statements_path = os.path.join(GENERATED_PATH, "problem_descriptions")
+
+    if os.path.exists(problem_statements_path) and not force:
+        print("Problem Statements already filtered. skiping...")
+        return
+
+    os.makedirs(problem_statements_path, exist_ok=True)
+
+    for problem_id in tqdm(problem_list_df.index):
+        src = id2desc(problem_id)
+        dst = os.path.join(problem_statements_path, os.path.basename(src))
+        with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+            fdst.write(fsrc.read())
+
+
+def codenet_prepare_kaggle(
+    problem_list_df: pd.DataFrame, submission_pairs_df: pd.DataFrame
+):
+    LOGGER.info("creating kaggle zip...")
+
+    problem_statements_path = os.path.join(GENERATED_PATH, "problem_descriptions")
+    kaggle_zip_path = os.path.join(GENERATED_PATH, "bugnet.zip")
+    bugnet_train_path = os.path.join(GENERATED_PATH, "train.jsonl")
+    bugnet_test_path = os.path.join(GENERATED_PATH, "test.jsonl")
+    bugnet_descriptions_path = os.path.join(GENERATED_PATH, "problem_descriptions.json")
+
+    unique_problem_ids = problem_list_df.index
+    split_index = int(len(unique_problem_ids) * 0.8)
+
+    train_problem_ids = unique_problem_ids[:split_index]
+    test_problem_ids = unique_problem_ids[split_index:]
+
+    train_df = submission_pairs_df[
+        submission_pairs_df["problem_id"].isin(train_problem_ids)
+    ]
+    test_df = submission_pairs_df[
+        submission_pairs_df["problem_id"].isin(test_problem_ids)
+    ]
+
+    train_df.to_json(bugnet_train_path, orient="records", lines=True)
+    test_df.to_json(bugnet_test_path, orient="records", lines=True)
+
+    descriptions = []
+    for problem_id in tqdm(problem_list_df.index):
+        src = id2desc(problem_id)
+        with open(src, "r") as f:
+            description = f.read()
+            descriptions.append({"problem_id": problem_id, "description": description})
+    descriptions_df = pd.DataFrame(descriptions)
+    descriptions_df.to_json(bugnet_descriptions_path, orient="records")
+
+    with ZipFile(kaggle_zip_path, "w") as zip_obj:
+        zip_obj.write(bugnet_train_path, os.path.basename(bugnet_train_path))
+        zip_obj.write(bugnet_test_path, os.path.basename(bugnet_test_path))
+        zip_obj.write(
+            bugnet_descriptions_path, os.path.basename(bugnet_descriptions_path)
+        )
+
+
+def main():
+    codenet_download_data()
+    problem_list_df = codenet_filter_problems()
+    submission_pairs_df = codenet_submission_pairs(problem_list_df)
+    codenet_problem_statements(problem_list_df)
+    codenet_prepare_kaggle(problem_list_df, submission_pairs_df)
+
+
 if __name__ == "__main__":
     levels = {
         "critical": logging.CRITICAL,
@@ -535,6 +609,4 @@ if __name__ == "__main__":
     os.makedirs(INPUT_PATH, exist_ok=True)
     os.makedirs(GENERATED_PATH, exist_ok=True)
 
-    codenet_download_data()
-    problem_list_df = codenet_filter_problems()
-    submission_pairs_df = codenet_submission_pairs(problem_list_df)
+    main()
