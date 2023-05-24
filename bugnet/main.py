@@ -532,7 +532,7 @@ def codenet_prepare_kaggle(
     problem_statements_path = os.path.join(GENERATED_PATH, "problem_descriptions")
     kaggle_zip_path = os.path.join(GENERATED_PATH, "bugnet.zip")
     bugnet_train_path = os.path.join(GENERATED_PATH, "train.jsonl")
-    bugnet_valid_path = os.path.join(GENERATED_PATH, "valid.jsonl")
+    bugnet_valid_path = os.path.join(GENERATED_PATH, "validation.jsonl")
     bugnet_test_path = os.path.join(GENERATED_PATH, "test.jsonl")
     bugnet_descriptions_path = os.path.join(GENERATED_PATH, "problem_descriptions.json")
 
