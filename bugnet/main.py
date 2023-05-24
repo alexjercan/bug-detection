@@ -532,36 +532,47 @@ def codenet_prepare_kaggle(
     problem_statements_path = os.path.join(GENERATED_PATH, "problem_descriptions")
     kaggle_zip_path = os.path.join(GENERATED_PATH, "bugnet.zip")
     bugnet_train_path = os.path.join(GENERATED_PATH, "train.jsonl")
+    bugnet_valid_path = os.path.join(GENERATED_PATH, "valid.jsonl")
     bugnet_test_path = os.path.join(GENERATED_PATH, "test.jsonl")
     bugnet_descriptions_path = os.path.join(GENERATED_PATH, "problem_descriptions.json")
 
-    unique_problem_ids = problem_list_df.index
+    codex_pairs_df = submission_pairs_df.groupby("language").head(100)
+    test_problem_ids = codex_pairs_df["problem_id"].unique()
+
+    unique_problem_ids = [index for index in problem_list_df.index if index not in test_problem_ids]
+
     split_index = int(len(unique_problem_ids) * 0.8)
 
     train_problem_ids = unique_problem_ids[:split_index]
-    test_problem_ids = unique_problem_ids[split_index:]
+    valid_problem_ids = unique_problem_ids[split_index:]
 
     train_df = submission_pairs_df[
         submission_pairs_df["problem_id"].isin(train_problem_ids)
+    ]
+    valid_df = submission_pairs_df[
+        submission_pairs_df["problem_id"].isin(valid_problem_ids)
     ]
     test_df = submission_pairs_df[
         submission_pairs_df["problem_id"].isin(test_problem_ids)
     ]
 
     train_df.to_json(bugnet_train_path, orient="records", lines=True)
+    valid_df.to_json(bugnet_valid_path, orient="records", lines=True)
     test_df.to_json(bugnet_test_path, orient="records", lines=True)
 
     descriptions = []
     for problem_id in tqdm(problem_list_df.index):
         src = id2desc(problem_id)
-        with open(src, "r") as f:
-            description = f.read()
+        with open(src, "r", encoding="utf-8") as desc:
+            description = desc.read()
             descriptions.append({"problem_id": problem_id, "description": description})
+
     descriptions_df = pd.DataFrame(descriptions)
     descriptions_df.to_json(bugnet_descriptions_path, orient="records")
 
     with ZipFile(kaggle_zip_path, "w") as zip_obj:
         zip_obj.write(bugnet_train_path, os.path.basename(bugnet_train_path))
+        zip_obj.write(bugnet_valid_path, os.path.basename(bugnet_valid_path))
         zip_obj.write(bugnet_test_path, os.path.basename(bugnet_test_path))
         zip_obj.write(
             bugnet_descriptions_path, os.path.basename(bugnet_descriptions_path)
