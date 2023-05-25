@@ -57,6 +57,7 @@ def walk_dataset(years):
                 test_cases = []
                 for (test, output) in module.TESTS:
                     test_cases.append(f"assert solve({test!r}) == {output!r}")
+                test_cases = "\n".join(test_cases)
 
                 pass_paths = sorted(glob(os.path.join(part_path, "pass*.py")))
                 fail_paths = sorted(glob(os.path.join(part_path, "fail*.py")))
