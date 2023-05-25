@@ -529,17 +529,16 @@ def codenet_prepare_kaggle(
 ):
     LOGGER.info("creating kaggle zip...")
 
-    problem_statements_path = os.path.join(GENERATED_PATH, "problem_descriptions")
     kaggle_zip_path = os.path.join(GENERATED_PATH, "bugnet.zip")
-    bugnet_train_path = os.path.join(GENERATED_PATH, "train.jsonl")
-    bugnet_valid_path = os.path.join(GENERATED_PATH, "validation.jsonl")
-    bugnet_test_path = os.path.join(GENERATED_PATH, "test.jsonl")
     bugnet_descriptions_path = os.path.join(GENERATED_PATH, "problem_descriptions.json")
 
     codex_pairs_df = submission_pairs_df.groupby("language").head(100)
     test_problem_ids = codex_pairs_df["problem_id"].unique()
 
-    unique_problem_ids = [index for index in problem_list_df.index if index not in test_problem_ids]
+    unique_problem_ids = [
+        index for index in problem_list_df.index if index not in test_problem_ids
+    ]
+    unique_languages = submission_pairs_df["language"].unique()
 
     split_index = int(len(unique_problem_ids) * 0.8)
 
@@ -556,10 +555,6 @@ def codenet_prepare_kaggle(
         submission_pairs_df["problem_id"].isin(test_problem_ids)
     ]
 
-    train_df.to_json(bugnet_train_path, orient="records", lines=True)
-    valid_df.to_json(bugnet_valid_path, orient="records", lines=True)
-    test_df.to_json(bugnet_test_path, orient="records", lines=True)
-
     descriptions = []
     for problem_id in tqdm(problem_list_df.index):
         src = id2desc(problem_id)
@@ -570,10 +565,28 @@ def codenet_prepare_kaggle(
     descriptions_df = pd.DataFrame(descriptions)
     descriptions_df.to_json(bugnet_descriptions_path, orient="records")
 
-    with ZipFile(kaggle_zip_path, "w") as zip_obj:
-        zip_obj.write(bugnet_train_path, os.path.basename(bugnet_train_path))
-        zip_obj.write(bugnet_valid_path, os.path.basename(bugnet_valid_path))
-        zip_obj.write(bugnet_test_path, os.path.basename(bugnet_test_path))
+    with ZipFile(kaggle_zip_path, "w"):
+        pass
+
+    for language in unique_languages:
+        lang_train_df = train_df[train_df["language"] == language]
+        lang_valid_df = valid_df[valid_df["language"] == language]
+        lang_test_df = test_df[test_df["language"] == language]
+
+        bugnet_train_path = os.path.join(GENERATED_PATH, language + "_train.jsonl")
+        bugnet_valid_path = os.path.join(GENERATED_PATH, language + "_validation.jsonl")
+        bugnet_test_path = os.path.join(GENERATED_PATH, language + "_test.jsonl")
+
+        lang_train_df.to_json(bugnet_train_path, orient="records", lines=True)
+        lang_valid_df.to_json(bugnet_valid_path, orient="records", lines=True)
+        lang_test_df.to_json(bugnet_test_path, orient="records", lines=True)
+
+        with ZipFile(kaggle_zip_path, "a") as zip_obj:
+            zip_obj.write(bugnet_train_path, os.path.basename(bugnet_train_path))
+            zip_obj.write(bugnet_valid_path, os.path.basename(bugnet_valid_path))
+            zip_obj.write(bugnet_test_path, os.path.basename(bugnet_test_path))
+
+    with ZipFile(kaggle_zip_path, "a") as zip_obj:
         zip_obj.write(
             bugnet_descriptions_path, os.path.basename(bugnet_descriptions_path)
         )
