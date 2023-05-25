@@ -15,7 +15,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Install dependencies
-      run: make -C aoc-dataset install
+      run: make install
 
     - name: Run check
       run: cd aoc-dataset && ./checker.sh

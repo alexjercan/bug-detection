@@ -8,8 +8,8 @@ install: ## Install dependencies
 	pip install -r requirements-dev.txt --upgrade --no-warn-script-location
 
 format: ## Format
-	python -m isort ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen ./description/ --skip .venv/
-	python -m black ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen ./description/ --exclude .venv/
+	python -m isort ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen ./description/ ./aoc-dataset/ --skip .venv/
+	python -m black ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen ./description/ ./aoc-dataset/ --exclude .venv/
 
 lint: ## Lint
 	python -m flake8 ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen
