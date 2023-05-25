@@ -6,6 +6,9 @@ import json
 import os
 from glob import glob
 
+from typing import Optional, Tuple
+from difflib import SequenceMatcher
+
 
 def import_from_path(path: str):
     """Imports a module from a path."""
@@ -14,6 +17,27 @@ def import_from_path(path: str):
     module_spec.loader.exec_module(module)
 
     return module
+
+
+def lines_diff_checker(
+    original_src: str, changed_src: str
+) -> Optional[Tuple[str, int, int, int, int]]:
+    """Checks the difference between two strings and returns the diff as a single chunk."""
+    original_src_lines = original_src.splitlines()
+    changed_src_lines = changed_src.splitlines()
+
+    opcodes = SequenceMatcher(None, original_src_lines, changed_src_lines).get_opcodes()
+    changes = list(filter(lambda opcode: opcode[0] != "equal", opcodes))
+    if not changes:
+        return None
+
+    if len(changes) == 1:
+        return changes[0]
+
+    _, i1, _, j1, _ = changes[0]
+    _, _, i2, _, j2 = changes[-1]
+
+    return "replace", i1, i2, j1, j2
 
 
 def walk_dataset(years):
@@ -42,6 +66,12 @@ def walk_dataset(years):
                     with open(fail_path, "r", encoding="utf-8") as file:
                         fail_content = file.read()
 
+                    diff = lines_diff_checker(fail_content, pass_content)
+                    if diff is None:
+                        print("Failed to find diff for", pass_path, fail_path)
+                        continue
+                    change, i1, i2, j1, j2 = diff
+
                     dataset.append(
                         {
                             "year": year,
@@ -50,6 +80,11 @@ def walk_dataset(years):
                             "pass": pass_content,
                             "fail": fail_content,
                             "test": test_cases,
+                            "change": change,
+                            "i1": i1,
+                            "i2": i2,
+                            "j1": j1,
+                            "j2": j2,
                         }
                     )
 
