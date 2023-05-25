@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Walks the directory structure and generates a dataset."""
+
+import importlib.util
+import json
+import os
+from glob import glob
+
+
+def import_from_path(path: str):
+    """Imports a module from a path."""
+    module_spec = importlib.util.spec_from_file_location("module", path)
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+
+    return module
+
+
+def walk_dataset(years):
+    """Walks the dataset and generates a list of problems."""
+    dataset = []
+
+    for year in years:
+        year = str(year)
+
+        for day in sorted(os.listdir(year)):
+            day_path = os.path.join(year, day)
+
+            for part in ["part1", "part2"]:
+                part_path = os.path.join(day_path, part)
+                module = import_from_path(os.path.join(part_path, "test.py"))
+
+                test_cases = []
+                for (test, output) in module.TESTS:
+                    test_cases.append(f"assert solve({test!r}) == {output!r}")
+
+                pass_paths = sorted(glob(os.path.join(part_path, "pass*.py")))
+                fail_paths = sorted(glob(os.path.join(part_path, "fail*.py")))
+                for pass_path, fail_path in zip(pass_paths, fail_paths):
+                    with open(pass_path, "r", encoding="utf-8") as file:
+                        pass_content = file.read()
+                    with open(fail_path, "r", encoding="utf-8") as file:
+                        fail_content = file.read()
+
+                    dataset.append(
+                        {
+                            "year": year,
+                            "day": day,
+                            "part": part,
+                            "pass": pass_content,
+                            "fail": fail_content,
+                            "test": test_cases,
+                        }
+                    )
+
+    return dataset
+
+
+if __name__ == "__main__":
+    DATASET = walk_dataset(years=[2022])
+
+    with open("dataset.jsonl", "w", encoding="utf-8") as FILE:
+        for DATA in DATASET:
+            FILE.write(json.dumps(DATA) + "\n")

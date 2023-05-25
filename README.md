@@ -36,3 +36,5 @@ make install
 5. To visualize the results of the `CodeGen` model on the `BugNet` dataset see [codegen](./codegen/)
 
 6. To visualize the results of the description generation on the `BugNet` dataset see [description](./description//)
+
+7. To visualiza the `AoC` dataaset see [aoc-dataset](./aoc-dataset/)
