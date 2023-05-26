@@ -82,6 +82,9 @@ def read_format_submission(
             capture_output=True,
             encoding="utf-8",
             errors="ignore",
+            preexec_fn=lambda: resource.setrlimit(
+                resource.RLIMIT_AS, (1024 * 1024 * 1024, resource.RLIM_INFINITY)
+            ),
         )
         return result.returncode == 0, result.stdout
     if language == "Python":
@@ -93,6 +96,9 @@ def read_format_submission(
             capture_output=True,
             encoding="utf-8",
             errors="ignore",
+            preexec_fn=lambda: resource.setrlimit(
+                resource.RLIMIT_AS, (1024 * 1024 * 1024, resource.RLIM_INFINITY)
+            ),
         )
         return result.returncode == 0, result.stdout
 
@@ -142,6 +148,26 @@ def lines_diff_checker(
     return changes[0]
 
 
+def lines_diff_chunk_checker(
+    original_src: str, changed_src: str
+) -> Optional[Tuple[str, int, int, int, int]]:
+    original_src_lines = original_src.splitlines()
+    changed_src_lines = changed_src.splitlines()
+
+    opcodes = SequenceMatcher(None, original_src_lines, changed_src_lines).get_opcodes()
+    changes = list(filter(lambda opcode: opcode[0] != "equal", opcodes))
+    if not changes:
+        return None
+
+    if len(changes) == 1:
+        return changes[0]
+
+    _, i1, _, j1, _ = changes[0]
+    _, _, i2, _, j2 = changes[-1]
+
+    return "replace", i1, i2, j1, j2
+
+
 def linter_check_submission(problem_id: str, language: str, submission_id: str) -> bool:
     path = id2submission(problem_id, language, submission_id)
 
@@ -162,6 +188,9 @@ def linter_check_submission(problem_id: str, language: str, submission_id: str) 
             capture_output=True,
             encoding="utf-8",
             errors="ignore",
+            preexec_fn=lambda: resource.setrlimit(
+                resource.RLIMIT_AS, (1024 * 1024 * 1024, resource.RLIM_INFINITY)
+            ),
         )
         return result.returncode == 0
 
@@ -361,8 +390,10 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                     f"Checking submission {id2submission(problem_id, language, original_id)}"
                 )
 
-                if original_id == "s237078692":
-                    LOGGER.debug("You are so smart aren't you mister...")
+                if original_id in ["s237078692", "s717600459"]:
+                    LOGGER.debug(
+                            f"Submission {id2submission(problem_id, language, original_id)} would crash the tool. You are so smart aren't you mister..."
+                    )
                     continue
 
                 # Check if status is non-Accepted -> Accepted; otherwise skip
@@ -391,7 +422,13 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                 #     continue
                 # Check if there is only one chunk of lines changed between the
                 # original and the changed src; otherwise skip
-                diff = lines_diff_checker(original_format_src, changed_format_src)
+                # diff = lines_diff_checker(original_format_src, changed_format_src)
+                # if diff is None:
+                #     continue
+                # Check if there is only one chunk of lines changed between the
+                # original and the changed src; if there are multiple chunks
+                # merge everything from the start chunk to last chunk;
+                diff = lines_diff_chunk_checker(original_format_src, changed_format_src)
                 if diff is None:
                     continue
                 change, i1, i2, j1, j2 = diff
@@ -512,7 +549,7 @@ def codenet_problem_statements(problem_list_df: pd.DataFrame, force: bool = Fals
     problem_statements_path = os.path.join(GENERATED_PATH, "problem_descriptions")
 
     if os.path.exists(problem_statements_path) and not force:
-        print("Problem Statements already filtered. skiping...")
+        LOGGER.info("Problem Statements already filtered. skiping...")
         return
 
     os.makedirs(problem_statements_path, exist_ok=True)
@@ -619,18 +656,32 @@ if __name__ == "__main__":
         choices=list(levels.keys()),
         help="Provide logging level. Example --loglevel debug, default=warning",
     )
+    parser.add_argument(
+        "-P",
+        "--cpu",
+        default=P,
+        dest="cpu",
+        type=int,
+        help="Number of CPU cores to use, default=cpu_count()",
+    )
     args = parser.parse_args()
 
-    LOGGER.addHandler(logging.StreamHandler())
-    LOGGER.addHandler(logging.FileHandler(os.getenv("LOG_FILE", LOG_PATH)))
-    LOGGER.setLevel(levels[args.loglevel])
-
-    logging.basicConfig(
-        format="%(levelname)s: %(asctime)s %(message)s",
-        datefmt="%d/%m/%y %H:%M:%S",
+    formatter = logging.Formatter(
+        fmt="%(levelname)s: %(asctime)s %(message)s", datefmt="%d/%m/%y %H:%M:%S"
     )
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    LOGGER.addHandler(handler)
+
+    handler = logging.FileHandler(os.getenv("LOG_FILE", LOG_PATH))
+    handler.setFormatter(formatter)
+    LOGGER.addHandler(handler)
+
+    LOGGER.setLevel(levels[args.loglevel])
 
     os.makedirs(INPUT_PATH, exist_ok=True)
     os.makedirs(GENERATED_PATH, exist_ok=True)
+
+    P = args.cpu
 
     main()
