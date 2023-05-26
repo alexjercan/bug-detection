@@ -18,8 +18,8 @@ jupyter notebook
 
 ## About the Dataset
 
-The generated dataset can be found on Kaggle. Dataset can be found
-[here](https://www.kaggle.com/datasets/alexjercan/bugnet).
+The generated dataset can be found on Huggingface. Dataset can be found
+[here](https://huggingface.co/datasets/alexjercan/bugnet).
 
 The dataset is based on the CodeNet project and contains python and C++ code
 submissions for online coding competitions. The data is obtained by selecting
