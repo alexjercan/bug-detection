@@ -42,8 +42,8 @@ The resulting dataset file will be a csv with the following columns:
 - `problem_id`: The id of the problem, matches with the id from Project_CodeNet
 - `language`: The programming language of the submission (`Python` or `C++`)
 - `original_status`: The status of the initial submission (`TLE`, `MLE`, anything that is not `Accepted`)
-- `original_src`: The initial (buggy) source code formatted (`black` or `clang-fromat`)
-- `changed_src`: The modified (accepted) source code formatted(`black` or `clang-format`
+- `fail`: The initial (buggy) source code formatted (`black` or `clang-fromat`)
+- `pass`: The modified (accepted) source code formatted(`black` or `clang-format`
 - `change`: The change that was made (`replace`, `insert`, `delete`)
 - `i1`: Start of the change in the buggy source
 - `i2`: End of the change in the buggy source
@@ -51,6 +51,9 @@ The resulting dataset file will be a csv with the following columns:
 - `j2`: End of the change in the accepted source
 - `error`: The error that was obtained running the buggy source code on the input/output examples
 - `stderr`: The full output of stderr of running the buggy source code on the input/output examples
+- `description`: The problem statement in html format
+- `input`: The input for the test case
+- `output`: The output for the test case
 
 ## Dependencies
 

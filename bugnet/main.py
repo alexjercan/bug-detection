@@ -346,8 +346,8 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
         "problem_id",
         "language",
         "original_status",
-        "original_src",
-        "changed_src",
+        "pass",
+        "fail",
         "change",
         "i1",
         "i2",
@@ -568,6 +568,7 @@ def codenet_prepare_kaggle(
 
     kaggle_zip_path = os.path.join(GENERATED_PATH, "bugnet.zip")
     bugnet_descriptions_path = os.path.join(GENERATED_PATH, "problem_descriptions.json")
+    bugnet_tests_path = os.path.join(GENERATED_PATH, "problem_tests.json")
 
     codex_pairs_df = submission_pairs_df.groupby("language").head(100)
     test_problem_ids = codex_pairs_df["problem_id"].unique()
@@ -602,6 +603,18 @@ def codenet_prepare_kaggle(
     descriptions_df = pd.DataFrame(descriptions)
     descriptions_df.to_json(bugnet_descriptions_path, orient="records")
 
+    test_cases = []
+    for problem_id in tqdm(problem_list_df.index):
+        with open(id2inout(problem_id, name="input"), "r", encoding="utf-8") as f:
+            input_ = f.read()
+        with open(id2inout(problem_id, name="output"), "r", encoding="utf-8") as f:
+            output = f.read()
+
+        test_cases.append({"problem_id": problem_id, "input": input_, "output": output})
+
+    test_cases_df = pd.DataFrame(test_cases)
+    test_cases_df.to_json(bugnet_tests_path, orient="records")
+
     with ZipFile(kaggle_zip_path, "w"):
         pass
 
@@ -627,6 +640,7 @@ def codenet_prepare_kaggle(
         zip_obj.write(
             bugnet_descriptions_path, os.path.basename(bugnet_descriptions_path)
         )
+        zip_obj.write(bugnet_tests_path, os.path.basename(bugnet_tests_path))
 
 
 def main():
