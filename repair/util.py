@@ -14,7 +14,8 @@ def color_source(source_code: str, i1: int, i2: int, color: str = "red"):
             if char == "\n":
                 char = "↵\n"
                 norm_color = "lightgrey"
-            text += f'<span style="color:{color if i1 <= i <= i2 else norm_color};">{char}</span>'
+            col = color if i1 <= i <= i2 else norm_color
+            text += f'<span style="color:{col};">{char}</span>'
 
     return "<pre>" + text + "</pre>"
 

@@ -22,7 +22,7 @@ def import_from_path(path: str):
 def lines_diff_checker(
     original_src: str, changed_src: str
 ) -> Optional[Tuple[str, int, int, int, int]]:
-    """Checks the difference between two strings and returns the diff as a single chunk."""
+    """Checks the diff between two strings and returns the diff as a single chunk."""
     original_src_lines = original_src.splitlines()
     changed_src_lines = changed_src.splitlines()
 

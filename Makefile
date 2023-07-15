@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: install fmt lint bugnet description repair
+.PHONY: install fmt lint mypy pyright pylint checks bugnet description repair
 
 ### QUICK
 # ¯¯¯¯¯¯¯
@@ -15,7 +15,22 @@ fmt: ## Format
 	python -m black ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/  --exclude .venv/
 
 lint: ## Lint
-	python -m flake8 ./codenetpy ./bugnet ./repair-pipeline ./codex ./codegen
+	python -m flake8 ./bugnet/ ./aoc-dataset/ ./description/ ./repair/
+
+mypy: ## Check with mypy
+	python -m mypy ./bugnet/ --ignore-missing-imports
+	python -m mypy ./aoc-dataset/*.py --ignore-missing-imports
+	python -m mypy ./description/ --ignore-missing-imports
+	python -m mypy ./repair-pipeline/ --ignore-missing-imports
+	python -m mypy ./repair/ --ignore-missing-imports
+
+pyright: ## Check with pyright
+	python -m pyright ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/
+
+pylint: ## Check with pylint
+	python -m pylint ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/
+
+checks: lint pylint mypy pyright
 
 bugnet: ## BugNet
 	python bugnet/main.py --log info

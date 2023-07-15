@@ -387,19 +387,22 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
 
         submissions_diff_dfs = []
         grouped_users = problem_df.sort_values("date").groupby("user_id")
-        for user_id, submission_df in grouped_users:
+        for _, submission_df in grouped_users:
             if len(submission_df) < 2:
                 continue
 
             submission_ids = submission_df.index.unique()
             for original_id, changed_id in zip(submission_ids, submission_ids[1:]):
                 LOGGER.debug(
-                    f"Checking submission {id2submission(problem_id, language, original_id)}"
+                    "Checking submission %s",
+                    id2submission(problem_id, language, original_id),
                 )
 
                 if original_id in ["s237078692", "s717600459"]:
                     LOGGER.debug(
-                        f"Submission {id2submission(problem_id, language, original_id)} would crash the tool. You are so smart aren't you mister..."
+                        "Submission %s would crash the tool."
+                        "You are so smart aren't you mister...",
+                        id2submission(problem_id, language, original_id),
                     )
                     continue
 

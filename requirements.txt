@@ -1,9 +1,9 @@
 jupyter==1.0.0
-numpy==1.24.2
-openai==0.27.2
-pandas==1.5.3
+numpy==1.25.1
+openai==0.27.8
+pandas==2.0.3
 seaborn==0.12.2
-torch==2.0.0
+torch==2.0.1
 tqdm==4.65.0
-transformers==4.27.4
+transformers==4.30.2
 wget==3.2
