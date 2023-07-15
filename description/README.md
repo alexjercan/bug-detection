@@ -9,7 +9,7 @@ TODO
 2. Run the script and generate the model results
 
 ```console
-python main.py --model openai-gpt
+python main.py --model gpt-3.5-turbo
 ```
 
 The results will be generated in a csv file that is prefixed with the name of

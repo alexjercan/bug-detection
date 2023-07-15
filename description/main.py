@@ -35,6 +35,7 @@ ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DERIVED_PATH = os.path.join(ROOT_PATH, "derived")
 GENERATED_PATH = os.path.join(INPUT_PATH, "bugnet")
 
+MODEL_CHATGPT = "gpt-3.5-turbo"
 MODEL_TEXT_DAVINCI_003 = "text-davinci-003"
 MODEL_CODEGEN = "codegen"
 MODEL_OPENAIGPT = "openai-gpt"
@@ -74,7 +75,7 @@ def make_prompt_multishot(
 def generate_results(
     submission_pairs_df: pd.DataFrame,
     prompt_type: str = PROMPT_SIMPLE,
-    model_type: str = MODEL_TEXT_DAVINCI_003,
+    model_type: str = MODEL_CHATGPT,
     force: bool = False,
 ) -> Tuple[pd.DataFrame, List[List[torch.Tensor]]]:
     results_path = os.path.join(GENERATED_PATH, f"{model_type}_description_results.csv")
@@ -100,6 +101,23 @@ def generate_results(
         raise NotImplementedError(f"{prompt_type} is not implemented yet")
 
     if model_type == MODEL_TEXT_DAVINCI_003:
+        assert (
+            os.environ.get("OPENAI_API_KEY") is not None
+        ), "You have to provide an api key for openai"
+
+        def result_fn(prompt: str) -> Tuple[str, List[torch.Tensor]]:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a senior developer."},
+                    {"role": "user", "content": prompt},
+                ]
+            )
+            result = response["choices"][0]["message"]["content"]
+            time.sleep(1)
+            return result, None
+
+    elif model_type == MODEL_TEXT_DAVINCI_003:
         assert (
             os.environ.get("OPENAI_API_KEY") is not None
         ), "You have to provide an api key for openai"
@@ -175,7 +193,7 @@ def generate_results(
                     + f"{exc}\ntraceback:\n{traceback.format_exc()}"
                 )
             else:
-                pbar.set_description(f"[generate codex] processing {pair_id}")
+                pbar.set_description(f"[generate description] processing {pair_id}")
                 pbar.update(1)
 
     results = pd.DataFrame(results, columns=["index", "predicted"])
@@ -221,8 +239,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "-m",
         "--model",
-        default=MODEL_GPT2,
-        choices=[MODEL_TEXT_DAVINCI_003, MODEL_CODEGEN, MODEL_OPENAIGPT, MODEL_GPT2],
+        default=MODEL_CHATGPT,
+        choices=[MODEL_CHATGPT, MODEL_TEXT_DAVINCI_003, MODEL_CODEGEN, MODEL_OPENAIGPT, MODEL_GPT2],
         help="Provide the model to use.",
     )
     args = parser.parse_args()

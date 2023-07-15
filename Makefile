@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: install format lint test.safety codenetpy bugnet codex codegen description
+.PHONY: install format lint test.safety codenetpy bugnet codex codegen description chatgpt
 
 ### QUICK
 # ¯¯¯¯¯¯¯
@@ -31,5 +31,8 @@ codet5: ## CodeT5 Experiments
 
 description: ## Let ChatGPT generate descriptions
 	TOKENIZERS_PARALLELISM=false python description/main.py --log info
+
+chatgpt: ## ChatGPT Experiments
+	python chatgpt/main.py --log info
 
 export PYTHONPATH=$PYTHONPATH:src

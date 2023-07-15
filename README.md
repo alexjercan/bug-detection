@@ -12,10 +12,13 @@ algorithms.
 
 This repository contains the scripts used for dataset generation. We have also
 added some exploratory data analysis notebooks for the generated datasets. The
-`codenetpy` folder contains the script used to generate the `CodeNetPy`
-dataset, the `bugnet` folder contains the script used to generate the `BugNet`
-dataset, and the `repair-pipeline` folder contains the demo applications for
-the models trained only on `CodeNetPy`.
+`bugnet` folder contains the script used to generate the *BugNet* dataset. The
+`repair-pipeline` folder contains the demo applications for the models trained
+only on the Python code from *BugNet*. The `aoc-dataset` folder contains the
+source code used to generate the *AoC* dataset. The `description` folder
+contains the source code used to generate the description in natural language
+of the bugs. The `repair` folder contains the source code used to evaluate
+different models on the data that we collected.
 
 To install the dependencies for development create a venv:
 
@@ -25,16 +28,12 @@ source .venv/bin/activate
 make install
 ```
 
-1. To generate the `CodeNetPy` dataset see [codenetpy](./codenetpy/)
+1. To run the repair pipeline see [repair-pipeline](./repair-pipeline/)
 
-2. To run the repair pipeline see [repair-pipeline](./repair-pipeline/)
+2. To generate the `BugNet` dataset see [bugnet](./bugnet/)
 
-3. To generate the `BugNet` dataset see [bugnet](./bugnet/)
+3. To visualize the `AoC` dataaset see [aoc-dataset](./aoc-dataset/)
 
-4. To visualize the results of `Codex` on the `BugNet` dataset see [codex](./codex/)
+4. To visualize the results of the description generation on the `BugNet` (of `AoC`) dataset see [description](./description//)
 
-5. To visualize the results of the `CodeGen` model on the `BugNet` dataset see [codegen](./codegen/)
-
-6. To visualize the results of the description generation on the `BugNet` dataset see [description](./description//)
-
-7. To visualize the `AoC` dataaset see [aoc-dataset](./aoc-dataset/)
+5. To visualize the result of the repair generation on the `BugNet` (or `AoC`) dataset see [repair](./repair/)
