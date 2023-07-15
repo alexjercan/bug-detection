@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Any
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from .model import Pipeline
@@ -34,14 +34,13 @@ def format_example_batched(example: Dict[str, List]) -> Dict[str, List]:
     }
 
 
-def codegen2_inference(example: Dict[str, List], model: AutoModelForCausalLM, tokenizer: AutoTokenizer, num_sequences: int) -> List[List[str]]:
+def codegen2_inference(example: Dict[str, Any], model: AutoModelForCausalLM, tokenizer: AutoTokenizer, num_sequences: int) -> List[str]:
     example = format_example_batched(example)
 
     text = example["text"]
-    batch_size = len(text)
 
     tokenized_input = tokenizer(
-        text,
+        [text],
         padding=True,
         truncation=True,
         max_length=256,
@@ -60,14 +59,9 @@ def codegen2_inference(example: Dict[str, List], model: AutoModelForCausalLM, to
 
     # Predictions is a list of shape (batch_size, num_sequences)
     predictions = []
-    for i in range(batch_size):
-        predictions_i = []
-        for j in range(num_sequences):
-            index = i * num_sequences + j
-            mask_prediction = tokenizer.decode(output_ids[index])[len(text[i]) :].split("<eom>")[0]
-            predictions_i.append(text[i].replace("<mask_1>", mask_prediction).split("<|endoftext|>")[0])
-
-        predictions.append(predictions_i)
+    for i in range(num_sequences):
+        mask_prediction = tokenizer.decode(output_ids[i])[len(text):].split("<eom>")[0]
+        predictions.append(text.replace("<mask_1>", mask_prediction).split("<|endoftext|>")[0])
 
     return predictions
 
@@ -88,5 +82,5 @@ class CodeGen2Pipeline(Pipeline):
         self.model = model
         self.num_sequences = num_sequences
 
-    def __call__(self, examples, **kwargs):
-        return codegen2_inference(examples, self.model, self.tokenizer, self.num_sequences)
+    def __call__(self, example: Dict[str, Any], **kwargs) -> List[str]:
+        return codegen2_inference(example, self.model, self.tokenizer, self.num_sequences)

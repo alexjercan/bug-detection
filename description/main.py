@@ -2,16 +2,12 @@ import logging
 import os
 
 import argparse
-import numpy as np
 import openai
 import pandas as pd
 import pickle
-import resource
-import subprocess
 import time
 import torch
 import traceback
-import uuid
 from pathlib import Path
 from tqdm.auto import tqdm
 from transformers import (

@@ -5,6 +5,7 @@ import resource
 import uuid
 from evaluate import load
 import os
+from args import DATASET_BUGNET, DATASET_AOC
 
 os.environ["HF_ALLOW_CODE_EVAL"] = "1"
 MAX_VIRTUAL_MEMORY = 100 * 1024 * 1024  # 100 MB
@@ -20,9 +21,9 @@ def execute_source(
     if language == "C++":
         out = f"/tmp/{uuid.uuid4()}.out"
 
-        result = subprocess.run(["g++", path, "-o", out], capture_output=True, check=True)
-
-        if result.returncode != 0:
+        try:
+            result = subprocess.run(["g++", path, "-o", out], capture_output=True, check=True)
+        except subprocess.CalledProcessError:
             return None
 
         try:
@@ -41,6 +42,8 @@ def execute_source(
             return result.stdout
         except subprocess.TimeoutExpired:
             return None
+        except subprocess.CalledProcessError:
+            return None
     if language == "Python":
         try:
             result = subprocess.run(
@@ -58,6 +61,8 @@ def execute_source(
 
             return result.stdout
         except subprocess.TimeoutExpired:
+            return None
+        except subprocess.CalledProcessError:
             return None
 
     raise NotImplementedError(f"{language} not implemented yet")
@@ -142,3 +147,13 @@ class BugNetMetric(Metric):
 class AoCMetric(Metric):
     def __call__(self, examples: Dict[str, List], num_sequences: int, timeout: float) -> Tuple:
         return compute_eval_metric_aoc(examples, num_sequences, timeout)
+
+
+def make_metric(dataset_path: str) -> Metric:
+    if dataset_path == DATASET_BUGNET:
+        return BugNetMetric()
+
+    if dataset_path == DATASET_AOC:
+        return AoCMetric()
+
+    raise ValueError(f"Unknown dataset: {dataset_path}")

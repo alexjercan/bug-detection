@@ -34,6 +34,6 @@ make install
 
 3. To visualize the `AoC` dataaset see [aoc-dataset](./aoc-dataset/)
 
-4. To visualize the results of the description generation on the `BugNet` (of `AoC`) dataset see [description](./description//)
+4. To visualize the results of the description generation on the `BugNet` (of `AoC`) dataset see [description](./description//) -- upgrade
 
 5. To visualize the result of the repair generation on the `BugNet` (or `AoC`) dataset see [repair](./repair/)

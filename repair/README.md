@@ -1,6 +1,16 @@
 # Repair
 
-TODO
+The repair experiments.
+
+Supported datasets
+
+- alexjercan/AoC
+- alexjercan/bugnet
+
+Supported models:
+
+- gpt-3.5-turbo
+- Salesforce/codegen2-1B
 
 ## Quickstart
 
@@ -21,6 +31,6 @@ evaluation_data_bugnet_gpt-3.5-turbo.data).
 jupyter notebook
 ```
 
-## About the models
+## About the results
 
 This is still WIP.
