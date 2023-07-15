@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: install format lint bugnet description repair
+.PHONY: install fmt lint bugnet description repair
 
 ### QUICK
 # ¯¯¯¯¯¯¯
@@ -10,7 +10,7 @@ help: ## Help
 install: ## Install dependencies
 	pip install -r requirements-dev.txt --upgrade --no-warn-script-location
 
-format: ## Format
+fmt: ## Format
 	python -m isort ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/  --skip .venv/
 	python -m black ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/  --exclude .venv/
 

@@ -1,18 +1,22 @@
-import math
-from typing import Dict, List, Optional, Tuple
-import subprocess
-import resource
-import uuid
-from evaluate import load
 import os
-from args import DATASET_BUGNET, DATASET_AOC
+
+import math
+import resource
+import subprocess
+import uuid
+from args import DATASET_AOC, DATASET_BUGNET
+from evaluate import load
+from typing import Dict, List, Optional, Tuple
 
 os.environ["HF_ALLOW_CODE_EVAL"] = "1"
 MAX_VIRTUAL_MEMORY = 100 * 1024 * 1024  # 100 MB
 
 
 def execute_source(
-    source_code: str, language: str, input_: str, timeout: Optional[float] = None
+    source_code: str,
+    language: str,
+    input_: str,
+    timeout: Optional[float] = None,
 ) -> Optional[str]:
     path = f"/tmp/{uuid.uuid4}.xxx"
     with open(path, "w", encoding="utf-8") as f:
@@ -22,7 +26,9 @@ def execute_source(
         out = f"/tmp/{uuid.uuid4()}.out"
 
         try:
-            result = subprocess.run(["g++", path, "-o", out], capture_output=True, check=True)
+            result = subprocess.run(
+                ["g++", path, "-o", out], capture_output=True, check=True
+            )
         except subprocess.CalledProcessError:
             return None
 
@@ -35,7 +41,8 @@ def execute_source(
                 encoding="utf-8",
                 errors="ignore",
                 preexec_fn=lambda: resource.setrlimit(
-                    resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY)
+                    resource.RLIMIT_AS,
+                    (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY),
                 ),
                 check=True,
             )
@@ -54,7 +61,8 @@ def execute_source(
                 encoding="utf-8",
                 errors="ignore",
                 preexec_fn=lambda: resource.setrlimit(
-                    resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY)
+                    resource.RLIMIT_AS,
+                    (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY),
                 ),
                 check=True,
             )
@@ -72,7 +80,9 @@ def generate_execution_results(
     example: Dict[str, List], timeout: Optional[float] = None
 ) -> Dict[str, List]:
     results = []
-    for prediction, input_, language in zip(example["predicted"], example["input"], example["language"]):
+    for prediction, input_, language in zip(
+        example["predicted"], example["input"], example["language"]
+    ):
         prediction_results = []
         for source in prediction:
             execute_output = execute_source(source, language, input_, timeout=timeout)
@@ -86,7 +96,7 @@ def generate_execution_results(
 def generate_powers_of_two(k: int) -> List[int]:
     max_exponent = math.floor(math.log2(k))
 
-    return [2 ** i for i in range(max_exponent + 1)]
+    return [2**i for i in range(max_exponent + 1)]
 
 
 def generate_assertion_statements(example: Dict[str, List]) -> Dict[str, List]:
@@ -103,10 +113,15 @@ def generate_assertion_statements(example: Dict[str, List]) -> Dict[str, List]:
     return {"assertion": results}
 
 
-def compute_eval_metric_bugnet(evaluation_data, num_sequences: int, timeout: float) -> Tuple:
+def compute_eval_metric_bugnet(
+    evaluation_data, num_sequences: int, timeout: float
+) -> Tuple:
     # Generate the execution output of the predicted source code
     evaluation_data = evaluation_data.map(
-        generate_execution_results, batched=True, num_proc=4, fn_kwargs={"timeout": timeout}
+        generate_execution_results,
+        batched=True,
+        num_proc=4,
+        fn_kwargs={"timeout": timeout},
     )
 
     # Generate the assertion statements for the execution output
@@ -118,16 +133,22 @@ def compute_eval_metric_bugnet(evaluation_data, num_sequences: int, timeout: flo
     code_eval = load("code_eval")
     k = generate_powers_of_two(num_sequences)
     return code_eval.compute(
-        predictions=evaluation_data["assertion"], references=["" for _ in evaluation_data["assertion"]], k=k
+        predictions=evaluation_data["assertion"],
+        references=["" for _ in evaluation_data["assertion"]],
+        k=k,
     )
 
 
-def compute_eval_metric_aoc(evaluation_data, num_sequences: int, timeout: float) -> Tuple:
+def compute_eval_metric_aoc(
+    evaluation_data, num_sequences: int, timeout: float
+) -> Tuple:
     # Compute the code eval (pass@k) for the predictions of the model
     code_eval = load("code_eval")
     k = generate_powers_of_two(num_sequences)
     return code_eval.compute(
-        predictions=evaluation_data["predicted"], references=evaluation_data["test"], k=k
+        predictions=evaluation_data["predicted"],
+        references=evaluation_data["test"],
+        k=k,
     )
 
 
@@ -135,17 +156,23 @@ class Metric:
     def __init__(self):
         pass
 
-    def __call__(self, examples: Dict[str, List], num_sequences: int, timeout: float) -> Tuple:
+    def __call__(
+        self, examples: Dict[str, List], num_sequences: int, timeout: float
+    ) -> Tuple:
         raise NotImplementedError("This method must be implemented by a subclass.")
 
 
 class BugNetMetric(Metric):
-    def __call__(self, examples: Dict[str, List], num_sequences: int, timeout: float) -> Tuple:
+    def __call__(
+        self, examples: Dict[str, List], num_sequences: int, timeout: float
+    ) -> Tuple:
         return compute_eval_metric_bugnet(examples, num_sequences, timeout)
 
 
 class AoCMetric(Metric):
-    def __call__(self, examples: Dict[str, List], num_sequences: int, timeout: float) -> Tuple:
+    def __call__(
+        self, examples: Dict[str, List], num_sequences: int, timeout: float
+    ) -> Tuple:
         return compute_eval_metric_aoc(examples, num_sequences, timeout)
 
 

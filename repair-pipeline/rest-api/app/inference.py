@@ -122,7 +122,11 @@ def predict_masked_source_code_step(
         .numpy()
     )
 
-    return i1, i2, tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True)
+    return (
+        i1,
+        i2,
+        tokenizer.batch_decode(tokenized_labels, skip_special_tokens=True),
+    )
 
 
 def predict_masked_source_code(
@@ -173,9 +177,7 @@ def predict_source_code(
     new_sources = []
     for error, token, source in zip(errors, tokens, sources):
         new_sources.append(
-            predict_masked_source_code(
-                tokenizer, model, error, token, source, beam_size
-            )
+            predict_masked_source_code(tokenizer, model, error, token, source, beam_size)
         )
 
     return new_sources
@@ -220,7 +222,10 @@ class Session:
         token_classes = [[] for _ in source_code]
         for error_description in zip(*error_descriptions):
             token_class = predict_token_class(
-                self.tokenizer_tc, self.model_tc, error_description, source_code
+                self.tokenizer_tc,
+                self.model_tc,
+                error_description,
+                source_code,
             )
             for i, tc in enumerate(token_class):
                 token_classes[i].append(tc)

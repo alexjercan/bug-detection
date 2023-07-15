@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Submits a solution to be checked."""
 
-import argparse
 import importlib.util
+
+import argparse
 from pathlib import Path
 
 

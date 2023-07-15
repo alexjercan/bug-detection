@@ -1,7 +1,7 @@
 import logging
+
 import argparse
 from dataclasses import dataclass
-
 
 DATASET_BUGNET = "alexjercan/bugnet"
 DATASET_AOC = "alexjercan/AoC"
@@ -45,11 +45,33 @@ def parse_args() -> Options:
         help="Provide logging level. Example --loglevel debug, default=warning",
     )
     parser.add_argument("--debug", action="store_true", help="Debug mode")
-    parser.add_argument("--dataset", type=str, default=DATASET_BUGNET, choices=[DATASET_BUGNET, DATASET_AOC], help="Dataset to use")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default=DATASET_BUGNET,
+        choices=[DATASET_BUGNET, DATASET_AOC],
+        help="Dataset to use",
+    )
     parser.add_argument("--subset", type=str, default="Python", help="Subset to use")
-    parser.add_argument("--checkpoint", type=str, default=MODEL_CHATGPT, choices=[MODEL_CHATGPT, MODEL_CODEGEN2], help="Checkpoint to use")
-    parser.add_argument("--timeout", type=float, default=2, help="Timeout for the execution of the generated code")
-    parser.add_argument("--num_sequences", type=int, default=2, help="Number of sequences to generate")
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=MODEL_CHATGPT,
+        choices=[MODEL_CHATGPT, MODEL_CODEGEN2],
+        help="Checkpoint to use",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=2,
+        help="Timeout for the execution of the generated code",
+    )
+    parser.add_argument(
+        "--num_sequences",
+        type=int,
+        default=2,
+        help="Number of sequences to generate",
+    )
     parser.add_argument("--split", type=str, default="test", help="Split to evaluate on")
 
     args = parser.parse_args()

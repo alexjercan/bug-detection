@@ -1,19 +1,18 @@
-import os
 import logging
-from models import make_pipeline
+import os
+
+from args import Options, parse_args
+from dataset import make_dataset
+from evaluate import load
 from metric import make_metric
 from tqdm.auto import tqdm
-from evaluate import load
-from dataset import make_dataset
-from util import generate_html_output, compute_bug_type
-from args import parse_args, Options
 
+from models import make_pipeline
+from util import compute_bug_type, generate_html_output
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 INPUT_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "input")
-LOG_PATH = os.path.join(
-    os.path.abspath(os.path.join(dir_path, os.pardir)), "repair.log"
-)
+LOG_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "repair.log")
 ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DERIVED_PATH = os.path.join(ROOT_PATH, "derived")
 GENERATED_PATH = os.path.join(INPUT_PATH, "repair")
@@ -61,7 +60,8 @@ def main(options: Options):
     # Compute the exact match accuracy of the best prediction in the returned sequence
     exact_match = load("exact_match")
     result = exact_match.compute(
-        predictions=[p[0] for p in evaluation_data["predicted"]], references=evaluation_data["pass"]
+        predictions=[p[0] for p in evaluation_data["predicted"]],
+        references=evaluation_data["pass"],
     )
     logging.info("Exact Match: %s", result)
 
@@ -70,7 +70,10 @@ def main(options: Options):
 
     # Generate the html output for the evaluation data
     evaluation_data = evaluation_data.map(
-        generate_html_output, batched=True, num_proc=4, fn_kwargs={"test_results": test_results}
+        generate_html_output,
+        batched=True,
+        num_proc=4,
+        fn_kwargs={"test_results": test_results},
     )
 
     # Compute the bug type (input, output, algorithm) using the pass code
@@ -80,20 +83,26 @@ def main(options: Options):
 
     # Compute the bug type (input, output, algorithm) using the predicted code
     evaluation_data = evaluation_data.map(
-        compute_bug_type, batched=True, num_proc=4, fn_kwargs={"which": "predicted"}
+        compute_bug_type,
+        batched=True,
+        num_proc=4,
+        fn_kwargs={"which": "predicted"},
     )
 
     # Compute the exact match accuracy of the bug type
     exact_match = load("exact_match")
     result = exact_match.compute(
-        predictions=[p[0] for p in evaluation_data["predicted_bug_type"]], references=evaluation_data["pass_bug_type"]
+        predictions=[p[0] for p in evaluation_data["predicted_bug_type"]],
+        references=evaluation_data["pass_bug_type"],
     )
     logging.info("Bug Type: %s", result)
 
     # Save the evaluation data
     data_name = dataset_path.split("/")[-1]
     model_name = checkpoint.split("/")[-1]
-    out_path = os.path.join(GENERATED_PATH, f"evaluation_data_{data_name}_{model_name}.data")
+    out_path = os.path.join(
+        GENERATED_PATH, f"evaluation_data_{data_name}_{model_name}.data"
+    )
     evaluation_data.save_to_disk(out_path)
 
     return evaluation_data

@@ -42,9 +42,7 @@ assert set(SUPPORTED_LANGUAGES).issubset(set(EXTENSIONS)), (
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 INPUT_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "input")
-LOG_PATH = os.path.join(
-    os.path.abspath(os.path.join(dir_path, os.pardir)), "bugnet.log"
-)
+LOG_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "bugnet.log")
 ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DATA_PATH = os.path.join(ROOT_PATH, "data")
 META_PATH = os.path.join(ROOT_PATH, "metadata")
@@ -67,7 +65,10 @@ def id2submission(
     submission_id: str,
 ) -> str:
     return os.path.join(
-        DATA_PATH, problem_id, language, f"{submission_id}.{EXTENSIONS[language]}"
+        DATA_PATH,
+        problem_id,
+        language,
+        f"{submission_id}.{EXTENSIONS[language]}",
     )
 
 
@@ -83,7 +84,8 @@ def read_format_submission(
             encoding="utf-8",
             errors="ignore",
             preexec_fn=lambda: resource.setrlimit(
-                resource.RLIMIT_AS, (1024 * 1024 * 1024, resource.RLIM_INFINITY)
+                resource.RLIMIT_AS,
+                (1024 * 1024 * 1024, resource.RLIM_INFINITY),
             ),
         )
         return result.returncode == 0, result.stdout
@@ -97,7 +99,8 @@ def read_format_submission(
             encoding="utf-8",
             errors="ignore",
             preexec_fn=lambda: resource.setrlimit(
-                resource.RLIMIT_AS, (1024 * 1024 * 1024, resource.RLIM_INFINITY)
+                resource.RLIMIT_AS,
+                (1024 * 1024 * 1024, resource.RLIM_INFINITY),
             ),
         )
         return result.returncode == 0, result.stdout
@@ -178,7 +181,8 @@ def linter_check_submission(problem_id: str, language: str, submission_id: str) 
             encoding="utf-8",
             errors="ignore",
             preexec_fn=lambda: resource.setrlimit(
-                resource.RLIMIT_AS, (1024 * 1024 * 1024, resource.RLIM_INFINITY)
+                resource.RLIMIT_AS,
+                (1024 * 1024 * 1024, resource.RLIM_INFINITY),
             ),
         )
         return result.returncode == 0
@@ -189,7 +193,8 @@ def linter_check_submission(problem_id: str, language: str, submission_id: str) 
             encoding="utf-8",
             errors="ignore",
             preexec_fn=lambda: resource.setrlimit(
-                resource.RLIMIT_AS, (1024 * 1024 * 1024, resource.RLIM_INFINITY)
+                resource.RLIMIT_AS,
+                (1024 * 1024 * 1024, resource.RLIM_INFINITY),
             ),
         )
         return result.returncode == 0
@@ -222,7 +227,8 @@ def execute_source(
                 encoding="utf-8",
                 errors="ignore",
                 preexec_fn=lambda: resource.setrlimit(
-                    resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY)
+                    resource.RLIMIT_AS,
+                    (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY),
                 ),
             )
             return str(result.returncode), str(result.stderr)
@@ -238,7 +244,8 @@ def execute_source(
                 encoding="utf-8",
                 errors="ignore",
                 preexec_fn=lambda: resource.setrlimit(
-                    resource.RLIMIT_AS, (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY)
+                    resource.RLIMIT_AS,
+                    (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY),
                 ),
             )
             rs = "|".join(
@@ -392,7 +399,7 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
 
                 if original_id in ["s237078692", "s717600459"]:
                     LOGGER.debug(
-                            f"Submission {id2submission(problem_id, language, original_id)} would crash the tool. You are so smart aren't you mister..."
+                        f"Submission {id2submission(problem_id, language, original_id)} would crash the tool. You are so smart aren't you mister..."
                     )
                     continue
 
@@ -446,7 +453,12 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                     error = "TLE", ""
                 else:
                     error = execute_source(
-                        problem_id, language, original_id, input, output, timeout=2.0
+                        problem_id,
+                        language,
+                        original_id,
+                        input,
+                        output,
+                        timeout=2.0,
                     )
                 if error is None:
                     continue
@@ -528,7 +540,8 @@ def codenet_submission_pairs(
                     problem_pairs_df = future.result()
                     dfs.append(problem_pairs_df)
                     problem_pairs_df.to_csv(
-                        generated_pairs_path + f".tmp.{problem_id}", index=False
+                        generated_pairs_path + f".tmp.{problem_id}",
+                        index=False,
                     )
                 except Exception as exc:
                     LOGGER.error(
@@ -638,7 +651,8 @@ def codenet_prepare_kaggle(
 
     with ZipFile(kaggle_zip_path, "a") as zip_obj:
         zip_obj.write(
-            bugnet_descriptions_path, os.path.basename(bugnet_descriptions_path)
+            bugnet_descriptions_path,
+            os.path.basename(bugnet_descriptions_path),
         )
         zip_obj.write(bugnet_tests_path, os.path.basename(bugnet_tests_path))
 
@@ -681,7 +695,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     formatter = logging.Formatter(
-        fmt="%(levelname)s: %(asctime)s %(message)s", datefmt="%d/%m/%y %H:%M:%S"
+        fmt="%(levelname)s: %(asctime)s %(message)s",
+        datefmt="%d/%m/%y %H:%M:%S",
     )
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)

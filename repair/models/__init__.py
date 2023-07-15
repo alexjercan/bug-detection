@@ -1,7 +1,8 @@
-from .codegen2 import CodeGen2Pipeline
+from args import MODEL_CHATGPT, MODEL_CODEGEN2
+
 from .chatgpt import ChatGPTPipeline
+from .codegen2 import CodeGen2Pipeline
 from .model import Pipeline
-from args import MODEL_CODEGEN2, MODEL_CHATGPT
 
 
 def make_pipeline(checkpoint: str) -> Pipeline:

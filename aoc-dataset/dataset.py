@@ -4,10 +4,10 @@
 import importlib.util
 import json
 import os
-from glob import glob
 
-from typing import Optional, Tuple
 from difflib import SequenceMatcher
+from glob import glob
+from typing import Optional, Tuple
 
 
 def import_from_path(path: str):
@@ -55,7 +55,7 @@ def walk_dataset(years):
                 module = import_from_path(os.path.join(part_path, "test.py"))
 
                 test_cases = []
-                for (test, output) in module.TESTS:
+                for test, output in module.TESTS:
                     test_cases.append(f"assert solve({test!r}) == {output!r}")
                 test_cases = "\n".join(test_cases)
 

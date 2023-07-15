@@ -1,6 +1,7 @@
-from typing import Dict, List, Any
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from typing import Any, Dict, List
+
 from .model import Pipeline
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,7 +35,12 @@ def format_example_batched(example: Dict[str, List]) -> Dict[str, List]:
     }
 
 
-def codegen2_inference(example: Dict[str, Any], model: AutoModelForCausalLM, tokenizer: AutoTokenizer, num_sequences: int) -> List[str]:
+def codegen2_inference(
+    example: Dict[str, Any],
+    model: AutoModelForCausalLM,
+    tokenizer: AutoTokenizer,
+    num_sequences: int,
+) -> List[str]:
     example = format_example_batched(example)
 
     text = example["text"]
@@ -60,8 +66,10 @@ def codegen2_inference(example: Dict[str, Any], model: AutoModelForCausalLM, tok
     # Predictions is a list of shape (batch_size, num_sequences)
     predictions = []
     for i in range(num_sequences):
-        mask_prediction = tokenizer.decode(output_ids[i])[len(text):].split("<eom>")[0]
-        predictions.append(text.replace("<mask_1>", mask_prediction).split("<|endoftext|>")[0])
+        mask_prediction = tokenizer.decode(output_ids[i])[len(text) :].split("<eom>")[0]
+        predictions.append(
+            text.replace("<mask_1>", mask_prediction).split("<|endoftext|>")[0]
+        )
 
     return predictions
 
@@ -83,4 +91,6 @@ class CodeGen2Pipeline(Pipeline):
         self.num_sequences = num_sequences
 
     def __call__(self, example: Dict[str, Any], **kwargs) -> List[str]:
-        return codegen2_inference(example, self.model, self.tokenizer, self.num_sequences)
+        return codegen2_inference(
+            example, self.model, self.tokenizer, self.num_sequences
+        )

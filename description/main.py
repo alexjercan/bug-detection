@@ -52,7 +52,10 @@ def make_prompt_simple(source: str) -> str:
 
 
 def make_prompt_multishot(
-    pairs_df: pd.DataFrame, source_id: int, source_row: pd.Series, count: int = 5
+    pairs_df: pd.DataFrame,
+    source_id: int,
+    source_row: pd.Series,
+    count: int = 5,
 ) -> str:
     pairs_df = pairs_df[
         (pairs_df["language"] == source_row["language"]) & (pairs_df.index != source_id)
@@ -105,9 +108,12 @@ def generate_results(
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are a senior developer."},
+                    {
+                        "role": "system",
+                        "content": "You are a senior developer.",
+                    },
                     {"role": "user", "content": prompt},
-                ]
+                ],
             )
             result = response["choices"][0]["message"]["content"]
             time.sleep(1)
@@ -236,7 +242,13 @@ if __name__ == "__main__":
         "-m",
         "--model",
         default=MODEL_CHATGPT,
-        choices=[MODEL_CHATGPT, MODEL_TEXT_DAVINCI_003, MODEL_CODEGEN, MODEL_OPENAIGPT, MODEL_GPT2],
+        choices=[
+            MODEL_CHATGPT,
+            MODEL_TEXT_DAVINCI_003,
+            MODEL_CODEGEN,
+            MODEL_OPENAIGPT,
+            MODEL_GPT2,
+        ],
         help="Provide the model to use.",
     )
     args = parser.parse_args()

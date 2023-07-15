@@ -1,6 +1,7 @@
-import time
 import openai
-from typing import Dict, List, Any
+import time
+from typing import Any, Dict, List
+
 from .model import Pipeline
 
 
@@ -15,9 +16,12 @@ def chatgpt_inference(example: Dict[str, Any], num_sequences: int) -> List[str]:
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "Respond with code only. The response will be used in a compiler, so do NOT include any type of comments. Propose code to fix the bug."},
+            {
+                "role": "system",
+                "content": "Respond with code only. The response will be used in a compiler, so do NOT include any type of comments. Propose code to fix the bug.",
+            },
             {"role": "user", "content": prompt},
-        ]
+        ],
     )
     chatgpt_result = response["choices"][0]["message"]["content"]
 
