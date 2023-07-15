@@ -15,7 +15,7 @@ fmt: ## Format
 	python -m black ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/  --exclude .venv/
 
 lint: ## Lint
-	python -m flake8 ./bugnet/ ./aoc-dataset/ ./description/ ./repair/
+	python -m flake8 ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/
 
 mypy: ## Check with mypy
 	python -m mypy ./bugnet/ --ignore-missing-imports
