@@ -17,8 +17,8 @@ added some exploratory data analysis notebooks for the generated datasets. The
 `bugnet` folder contains the script used to generate the *BugNet* dataset. The
 `repair-pipeline` folder contains the demo applications for the models trained
 only on the Python code from *BugNet*. The `aoc-dataset` folder contains the
-source code used to generate the *AoC* dataset. The `description` folder
-contains the source code used to generate the description in natural language
+source code used to generate the *AoC* dataset. The `hint` folder
+contains the source code used to generate the hint in natural language
 of the bugs. The `repair` folder contains the source code used to evaluate
 different models on the data that we collected.
 
@@ -36,6 +36,6 @@ make install
 
 3. To visualize the `AoC` dataaset see [aoc-dataset](./aoc-dataset/)
 
-4. To visualize the results of the description generation on the `BugNet` (of `AoC`) dataset see [description](./description//) -- upgrade
+4. To visualize the results of the hint generation on the `BugNet` (of `AoC`) dataset see [hint](./hint//) -- upgrade
 
 5. To visualize the result of the repair generation on the `BugNet` (or `AoC`) dataset see [repair](./repair/)

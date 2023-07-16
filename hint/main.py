@@ -14,9 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 INPUT_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "input")
-LOG_PATH = os.path.join(
-    os.path.abspath(os.path.join(dir_path, os.pardir)), "description.log"
-)
+LOG_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "hint.log")
 ROOT_PATH = os.path.join(INPUT_PATH, "Project_CodeNet")
 DERIVED_PATH = os.path.join(ROOT_PATH, "derived")
 GENERATED_PATH = os.path.join(INPUT_PATH, "hint")
