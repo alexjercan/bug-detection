@@ -7,7 +7,7 @@ from transformers import (
     RobertaTokenizerFast,
     T5ForConditionalGeneration,
 )
-from typing import List, Union
+from typing import List, Tuple, Union
 
 BEAM_SIZE = 5
 
@@ -68,7 +68,7 @@ def predict_token_class(
     all_labels = []
     for i in range(tokenized_labels.shape[0]):
         labels = [0] * len(source[i])
-        for j, label in enumerate(tokenized_labels[i]):
+        for j, _ in enumerate(tokenized_labels[i]):
             if tokenized_inputs.token_to_sequence(i, j) != 1:
                 continue
 
@@ -78,7 +78,7 @@ def predict_token_class(
                 continue
             labels[cs.start : cs.end] |= tokenized_labels[i, j]
 
-        all_labels.append([int(l) for l in labels])
+        all_labels.append([int(la) for la in labels])
 
     return all_labels
 
@@ -90,7 +90,7 @@ def predict_masked_source_code_step(
     tokens: List[int],
     source: str,
     beam_size=BEAM_SIZE,
-) -> List[str]:
+) -> Tuple[int, int, List[str]]:
     ct, i1, i2 = 0, 0, 0
     for i, t in enumerate(tokens):
         if t == 1 and ct == 0:
@@ -219,27 +219,27 @@ class Session:
         )
 
         logging.info("Predicting token classes...")
-        token_classes = [[] for _ in source_code]
-        for error_description in zip(*error_descriptions):
-            token_class = predict_token_class(
+        token_classes: List[List[List[int]]] = [[] for _ in source_code]
+        for error_description1 in zip(*error_descriptions):
+            token_class1 = predict_token_class(
                 self.tokenizer_tc,
                 self.model_tc,
-                error_description,
+                list(error_description1),
                 source_code,
             )
-            for i, tc in enumerate(token_class):
+            for i, tc in enumerate(token_class1):
                 token_classes[i].append(tc)
 
         logging.info("Generating source code...")
-        new_sources = [[] for _ in source_code]
-        for error_description, token_class in zip(
+        new_sources: List[List[List[str]]] = [[] for _ in source_code]
+        for error_description2, token_class2 in zip(
             zip(*error_descriptions), zip(*token_classes)
         ):
             new_source = predict_source_code(
                 self.tokenizer_cg,
                 self.model_cg,
-                error_description,
-                token_class,
+                list(error_description2),
+                list(token_class2),
                 source_code,
                 beam_size_cg,
             )

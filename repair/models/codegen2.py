@@ -43,7 +43,7 @@ def codegen2_inference(
 ) -> List[str]:
     example = format_example_batched(example)
 
-    text = example["text"]
+    text = str(example["text"])
 
     tokenized_input = tokenizer(
         [text],
@@ -68,7 +68,9 @@ def codegen2_inference(
     for i in range(num_sequences):
         mask_prediction = tokenizer.decode(output_ids[i])[len(text) :].split("<eom>")[0]
         predictions.append(
-            text.replace("<mask_1>", mask_prediction).split("<|endoftext|>")[0]
+            text.replace("<mask_1>", mask_prediction).split("<|endoftext|>", maxsplit=1)[
+                0
+            ]
         )
 
     return predictions

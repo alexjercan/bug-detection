@@ -36,7 +36,9 @@ def color_source(
         if char == "\n":
             char = "↵\n"
             color = ws_color
-        text += f'<span style="color:{accent_color if mask[i] == 1 else color};">{char}</span>'
+
+        col = accent_color if mask[i] == 1 else color
+        text += f'<span style="color:{col};">{char}</span>'
     return "<pre>" + text + "</pre>"
 
 
@@ -45,12 +47,15 @@ def view(
     error: List[str],
     labels: List[List[int]],
     new_source_code: List[List[str]],
-    theme=LIGHT_THEME,
+    theme=None,
     beam_size_ed=5,
 ):
-    source_code = [source_code for _ in range(beam_size_ed)]
+    if theme is None:
+        theme = LIGHT_THEME
+
+    source_codes = [source_code for _ in range(beam_size_ed)]
     source_code_html = [
-        color_source(src, labels[i], **theme) for i, src in enumerate(source_code)
+        color_source(src, labels[i], **theme) for i, src in enumerate(source_codes)
     ]
     error_html = [f"<pre>{err}</pre>" for err in error]
 
@@ -60,7 +65,7 @@ def view(
             [
                 color_source(
                     new_src,
-                    generate_char_mask(new_src, source_code[i]),
+                    generate_char_mask(new_src, source_codes[i]),
                     accent_color="green",
                     **theme,
                 )
@@ -72,7 +77,9 @@ def view(
     for i, new_srcs in enumerate(new_source_code_html):
         results.extend(
             [
-                f"<h1>Source code</h1>{source_code_html[i]}<h1>Error description</h1>{error_html[i]}<h1>Repaired code</h1>{new_src}"
+                f"<h1>Source code</h1>{source_code_html[i]}"
+                f"<h1>Error description</h1>{error_html[i]}"
+                f"<h1>Repaired code</h1>{new_src}"
                 for new_src in new_srcs
             ]
         )

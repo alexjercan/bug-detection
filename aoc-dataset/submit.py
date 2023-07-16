@@ -10,7 +10,10 @@ from pathlib import Path
 def import_from_path(path: str):
     """Imports a module from a path."""
     module_spec = importlib.util.spec_from_file_location("module", path)
+    assert module_spec is not None, f"Could not find module at {path}"
+    assert module_spec.loader is not None, f"Could not load module at {path}"
     module = importlib.util.module_from_spec(module_spec)
+    assert module is not None, f"Could not create module at {path}"
     module_spec.loader.exec_module(module)
 
     return module

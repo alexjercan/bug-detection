@@ -78,32 +78,41 @@ def read_format_submission(
     path = id2submission(problem_id, language, submission_id)
 
     if language == "C++":
-        result = subprocess.run(
-            ["clang-format", path],
-            capture_output=True,
-            encoding="utf-8",
-            errors="ignore",
-            preexec_fn=lambda: resource.setrlimit(
-                resource.RLIMIT_AS,
-                (1024 * 1024 * 1024, resource.RLIM_INFINITY),
-            ),
-        )
-        return result.returncode == 0, result.stdout
+        try:
+            result = subprocess.run(
+                ["clang-format", path],
+                capture_output=True,
+                encoding="utf-8",
+                errors="ignore",
+                preexec_fn=lambda: resource.setrlimit(
+                    resource.RLIMIT_AS,
+                    (1024 * 1024 * 1024, resource.RLIM_INFINITY),
+                ),
+                check=True,
+            )
+            return result.returncode == 0, result.stdout
+        except subprocess.CalledProcessError:
+            return False, ""
+
     if language == "Python":
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             content = f.read()
-        result = subprocess.run(
-            ["black", "-q", "-"],
-            input=content,
-            capture_output=True,
-            encoding="utf-8",
-            errors="ignore",
-            preexec_fn=lambda: resource.setrlimit(
-                resource.RLIMIT_AS,
-                (1024 * 1024 * 1024, resource.RLIM_INFINITY),
-            ),
-        )
-        return result.returncode == 0, result.stdout
+        try:
+            result = subprocess.run(
+                ["black", "-q", "-"],
+                input=content,
+                capture_output=True,
+                encoding="utf-8",
+                errors="ignore",
+                preexec_fn=lambda: resource.setrlimit(
+                    resource.RLIMIT_AS,
+                    (1024 * 1024 * 1024, resource.RLIM_INFINITY),
+                ),
+                check=True,
+            )
+            return result.returncode == 0, result.stdout
+        except subprocess.CalledProcessError:
+            return False, ""
 
     raise NotImplementedError(f"{language} not implemented yet")
 
@@ -175,29 +184,38 @@ def linter_check_submission(problem_id: str, language: str, submission_id: str) 
     path = id2submission(problem_id, language, submission_id)
 
     if language == "C++":
-        result = subprocess.run(
-            ["clang-tidy", path],
-            capture_output=True,
-            encoding="utf-8",
-            errors="ignore",
-            preexec_fn=lambda: resource.setrlimit(
-                resource.RLIMIT_AS,
-                (1024 * 1024 * 1024, resource.RLIM_INFINITY),
-            ),
-        )
-        return result.returncode == 0
+        try:
+            result = subprocess.run(
+                ["clang-tidy", path],
+                capture_output=True,
+                encoding="utf-8",
+                errors="ignore",
+                preexec_fn=lambda: resource.setrlimit(
+                    resource.RLIMIT_AS,
+                    (1024 * 1024 * 1024, resource.RLIM_INFINITY),
+                ),
+                check=True,
+            )
+            return result.returncode == 0
+        except subprocess.CalledProcessError:
+            return False
+
     if language == "Python":
-        result = subprocess.run(
-            ["flake8", path],
-            capture_output=True,
-            encoding="utf-8",
-            errors="ignore",
-            preexec_fn=lambda: resource.setrlimit(
-                resource.RLIMIT_AS,
-                (1024 * 1024 * 1024, resource.RLIM_INFINITY),
-            ),
-        )
-        return result.returncode == 0
+        try:
+            result = subprocess.run(
+                ["flake8", path],
+                capture_output=True,
+                encoding="utf-8",
+                errors="ignore",
+                preexec_fn=lambda: resource.setrlimit(
+                    resource.RLIMIT_AS,
+                    (1024 * 1024 * 1024, resource.RLIM_INFINITY),
+                ),
+                check=True,
+            )
+            return result.returncode == 0
+        except subprocess.CalledProcessError:
+            return False
 
     raise NotImplementedError(f"{language} not implemented yet")
 
@@ -206,7 +224,7 @@ def execute_source(
     problem_id: str,
     language: str,
     submission_id: str,
-    input: str,
+    input_: str,
     output: str,
     timeout: Optional[float] = None,
 ) -> Optional[Tuple[str, str]]:
@@ -214,14 +232,15 @@ def execute_source(
 
     if language == "C++":
         out = f"/tmp/{uuid.uuid4()}.out"
-        result = subprocess.run(["g++", path, "-o", out], capture_output=True)
-        if result.returncode != 0:
+        try:
+            subprocess.run(["g++", path, "-o", out], capture_output=True, check=True)
+        except subprocess.CalledProcessError:
             return None
 
         try:
             result = subprocess.run(
                 [out],
-                input=input,
+                input=input_,
                 timeout=timeout,
                 capture_output=True,
                 encoding="utf-8",
@@ -230,15 +249,24 @@ def execute_source(
                     resource.RLIMIT_AS,
                     (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY),
                 ),
+                check=False,
             )
+
+            if result.returncode == 0:
+                if result.stdout != output:
+                    return "WA", ""
+
+                return None
+
             return str(result.returncode), str(result.stderr)
         except subprocess.TimeoutExpired:
             return "TLE", ""
+
     if language == "Python":
         try:
             result = subprocess.run(
                 ["python3", path],
-                input=input,
+                input=input_,
                 timeout=timeout,
                 capture_output=True,
                 encoding="utf-8",
@@ -247,7 +275,15 @@ def execute_source(
                     resource.RLIMIT_AS,
                     (MAX_VIRTUAL_MEMORY, resource.RLIM_INFINITY),
                 ),
+                check=False,
             )
+
+            if result.returncode == 0:
+                if result.stdout != output:
+                    return "WA", ""
+
+                return None
+
             rs = "|".join(
                 [
                     r"^(\w*Error:.*).*",
@@ -287,23 +323,24 @@ def codenet_download_data(force: bool = False) -> None:
     tar_path = os.path.join(INPUT_PATH, tar_name)
 
     if os.path.exists(ROOT_PATH) and not force:
-        LOGGER.info(f"dataset root dir found at {ROOT_PATH}. skiping...")
+        LOGGER.info("dataset root dir found at %s. skiping...", ROOT_PATH)
         return
 
     if not os.path.exists(tar_path) or force:
-        LOGGER.info(f"download dataset from {data_url}/{tar_name}")
+        LOGGER.info("download dataset from %s/%s", data_url, tar_name)
         wget.download(f"{data_url}/{tar_name}", out=tar_path)
 
-    LOGGER.info(f"extract codenet to {INPUT_PATH}")
+    LOGGER.info("extract codenet to %s", INPUT_PATH)
     result = subprocess.run(
         f"tar -xzvf {tar_path} -C {INPUT_PATH}",
         capture_output=True,
         shell=True,
         encoding="utf-8",
         errors="ignore",
+        check=False,
     )
 
-    LOGGER.info(f"process finished with status {result.returncode}")
+    LOGGER.info("process finished with code %s", result.returncode)
 
 
 def codenet_filter_problems(force: bool = False) -> pd.DataFrame:
@@ -318,7 +355,7 @@ def codenet_filter_problems(force: bool = False) -> pd.DataFrame:
         return pd.read_csv(out_file_path, index_col="id")
 
     file_path = os.path.join(META_PATH, "problem_list.csv")
-    LOGGER.info(f"cleaning {file_path}")
+    LOGGER.info("cleaning dataset from %s", file_path)
 
     problem_list_df = pd.read_csv(file_path, index_col="id")
 
@@ -342,7 +379,7 @@ def codenet_filter_problems(force: bool = False) -> pd.DataFrame:
     LOGGER.debug("drop rating, targs and complexity")
     problem_list_df.drop(["rating", "tags", "complexity"], axis="columns", inplace=True)
 
-    LOGGER.info(f"save to {out_file_path}")
+    LOGGER.info("save cleaned dataset to %s", out_file_path)
     problem_list_df.to_csv(out_file_path)
 
     return problem_list_df
@@ -365,9 +402,9 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
     ]
     dfs = []
 
-    with open(id2inout(problem_id, name="input"), "r") as f:
-        input = f.read()
-    with open(id2inout(problem_id, name="output"), "r") as f:
+    with open(id2inout(problem_id, name="input"), "r", encoding="utf-8") as f:
+        input_ = f.read()
+    with open(id2inout(problem_id, name="output"), "r", encoding="utf-8") as f:
         output = f.read()
 
     problem_path = os.path.join(META_PATH, f"{problem_id}.csv")
@@ -450,26 +487,27 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
 
                 # Check and get the error annotations. If the original status
                 # is MLE we will trust it :) because my pc crashes
+                error_tup = None
                 if original_status == "Memory Limit Exceeded":
-                    error = "MLE", ""
+                    error_tup = "MLE", ""
                 elif original_status == "Time Limit Exceeded":
-                    error = "TLE", ""
+                    error_tup = "TLE", ""
                 else:
-                    error = execute_source(
+                    error_tup = execute_source(
                         problem_id,
                         language,
                         original_id,
-                        input,
+                        input_,
                         output,
                         timeout=2.0,
                     )
-                if error is None:
+                if error_tup is None:
                     continue
 
-                error, stderr = error
+                error, stderr = error_tup
 
                 LOGGER.debug(
-                    f"Added {id2submission(problem_id, language, original_id)} to csv"
+                    "Added %s to csv", id2submission(problem_id, language, original_id)
                 )
 
                 submissions_diff_dfs.append(
@@ -701,13 +739,13 @@ if __name__ == "__main__":
         fmt="%(levelname)s: %(asctime)s %(message)s",
         datefmt="%d/%m/%y %H:%M:%S",
     )
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    LOGGER.addHandler(handler)
+    s_handler = logging.StreamHandler()
+    s_handler.setFormatter(formatter)
+    LOGGER.addHandler(s_handler)
 
-    handler = logging.FileHandler(os.getenv("LOG_FILE", LOG_PATH))
-    handler.setFormatter(formatter)
-    LOGGER.addHandler(handler)
+    f_handler = logging.FileHandler(os.getenv("LOG_FILE", LOG_PATH))
+    f_handler.setFormatter(formatter)
+    LOGGER.addHandler(f_handler)
 
     LOGGER.setLevel(levels[args.loglevel])
 

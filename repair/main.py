@@ -2,13 +2,12 @@ import logging
 import os
 
 from args import Options, parse_args
-from dataset import make_dataset
-from evaluate import load
+from data import make_dataset
 from metric import make_metric
 from tqdm.auto import tqdm
 
 from models import make_pipeline
-from util import compute_bug_type, generate_html_output
+from util import generate_html_output
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 INPUT_PATH = os.path.join(os.path.abspath(os.path.join(dir_path, os.pardir)), "input")
@@ -39,10 +38,10 @@ def main(options: Options):
 
     n = len(evaluation_data)
     indices = list(range(n))
-    evaluation_data = evaluation_data.add_column("index", indices)
+    evaluation_data = evaluation_data.add_column("index", indices)  # type: ignore
 
     # Make the metric
-    code_eval = make_metric(dataset_path)
+    eval_metric = make_metric(dataset_path)
 
     # Generate the predictions of the code model on the eval data
     predictions = []
@@ -57,16 +56,9 @@ def main(options: Options):
 
     evaluation_data = evaluation_data.add_column("predicted", predictions)
 
-    # Compute the exact match accuracy of the best prediction in the returned sequence
-    exact_match = load("exact_match")
-    result = exact_match.compute(
-        predictions=[p[0] for p in evaluation_data["predicted"]],
-        references=evaluation_data["pass"],
-    )
-    logging.info("Exact Match: %s", result)
-
-    result, test_results = code_eval(evaluation_data, num_sequences, timeout)
-    logging.info("Code Eval: %s", result)
+    # Compute the evaluation metric
+    result, test_results = eval_metric(evaluation_data, num_sequences, timeout)
+    logging.info("%s", result)
 
     # Generate the html output for the evaluation data
     evaluation_data = evaluation_data.map(
@@ -75,27 +67,6 @@ def main(options: Options):
         num_proc=4,
         fn_kwargs={"test_results": test_results},
     )
-
-    # Compute the bug type (input, output, algorithm) using the pass code
-    evaluation_data = evaluation_data.map(
-        compute_bug_type, batched=True, num_proc=4, fn_kwargs={"which": "pass"}
-    )
-
-    # Compute the bug type (input, output, algorithm) using the predicted code
-    evaluation_data = evaluation_data.map(
-        compute_bug_type,
-        batched=True,
-        num_proc=4,
-        fn_kwargs={"which": "predicted"},
-    )
-
-    # Compute the exact match accuracy of the bug type
-    exact_match = load("exact_match")
-    result = exact_match.compute(
-        predictions=[p[0] for p in evaluation_data["predicted_bug_type"]],
-        references=evaluation_data["pass_bug_type"],
-    )
-    logging.info("Bug Type: %s", result)
 
     # Save the evaluation data
     data_name = dataset_path.split("/")[-1]

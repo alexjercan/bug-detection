@@ -7,6 +7,7 @@ import uuid
 from args import DATASET_AOC, DATASET_BUGNET
 from evaluate import load
 from typing import Dict, List, Optional, Tuple
+from util import compute_bug_type
 
 os.environ["HF_ALLOW_CODE_EVAL"] = "1"
 MAX_VIRTUAL_MEMORY = 100 * 1024 * 1024  # 100 MB
@@ -26,9 +27,7 @@ def execute_source(
         out = f"/tmp/{uuid.uuid4()}.out"
 
         try:
-            result = subprocess.run(
-                ["g++", path, "-o", out], capture_output=True, check=True
-            )
+            subprocess.run(["g++", path, "-o", out], capture_output=True, check=True)
         except subprocess.CalledProcessError:
             return None
 
@@ -114,42 +113,92 @@ def generate_assertion_statements(example: Dict[str, List]) -> Dict[str, List]:
 
 
 def compute_eval_metric_bugnet(
-    evaluation_data, num_sequences: int, timeout: float
+    examples: Dict[str, List], num_sequences: int, timeout: float
 ) -> Tuple:
     # Generate the execution output of the predicted source code
-    evaluation_data = evaluation_data.map(
-        generate_execution_results,
-        batched=True,
-        num_proc=4,
-        fn_kwargs={"timeout": timeout},
-    )
+    execution = generate_execution_results(examples, timeout=timeout)["execution"]
+    examples["execution"] = execution
 
     # Generate the assertion statements for the execution output
-    evaluation_data = evaluation_data.map(
-        generate_assertion_statements, batched=True, num_proc=4
-    )
+    assertion = generate_assertion_statements(examples)["assertion"]
 
     # Compute the code eval (pass@k) for the predictions of the model
     code_eval = load("code_eval")
     k = generate_powers_of_two(num_sequences)
-    return code_eval.compute(
-        predictions=evaluation_data["assertion"],
-        references=["" for _ in evaluation_data["assertion"]],
-        k=k,
+    result1_tup = code_eval.compute(
+        predictions=assertion, references=["" for _ in assertion], k=k
     )
 
+    assert isinstance(
+        result1_tup, tuple
+    ), f"The result of the evaluation must be a tuple, but got {type(result1_tup)}"
 
-def compute_eval_metric_aoc(
-    evaluation_data, num_sequences: int, timeout: float
-) -> Tuple:
+    result1, test_results = result1_tup
+
+    # Compute the exact match accuracy of the best prediction in the returned sequence
+    exact_match = load("exact_match")
+    result2 = exact_match.compute(
+        predictions=[p[0] for p in examples["predicted"]],
+        references=examples["pass"],
+    )
+
+    assert result2 is not None, "The exact match accuracy must not be None"
+
+    # Compute the exact match accuracy of the bug type
+    pass_bug_type = compute_bug_type(examples, "pass")["pass_bug_type"]
+    predicted_bug_type = compute_bug_type(examples, "predicted")["predicted_bug_type"]
+
+    exact_match = load("exact_match")
+    result3 = exact_match.compute(
+        predictions=predicted_bug_type, references=pass_bug_type
+    )
+
+    assert result3 is not None, "The exact match accuracy must not be None"
+
+    result = {**result1, **result2, **result3}
+
+    return result, test_results
+
+
+def compute_eval_metric_aoc(examples: Dict[str, List], num_sequences: int) -> Tuple:
     # Compute the code eval (pass@k) for the predictions of the model
     code_eval = load("code_eval")
     k = generate_powers_of_two(num_sequences)
-    return code_eval.compute(
-        predictions=evaluation_data["predicted"],
-        references=evaluation_data["test"],
+    result1_tup = code_eval.compute(
+        predictions=examples["predicted"],
+        references=examples["test"],
         k=k,
     )
+
+    assert isinstance(
+        result1_tup, tuple
+    ), f"The result of the evaluation must be a tuple, but got {type(result1_tup)}"
+
+    result1, test_results = result1_tup
+
+    # Compute the exact match accuracy of the best prediction in the returned sequence
+    exact_match = load("exact_match")
+    result2 = exact_match.compute(
+        predictions=[p[0] for p in examples["predicted"]],
+        references=examples["pass"],
+    )
+
+    assert result2 is not None, "The exact match accuracy must not be None"
+
+    # Compute the exact match accuracy of the bug type
+    pass_bug_type = compute_bug_type(examples, "pass")["pass_bug_type"]
+    predicted_bug_type = compute_bug_type(examples, "predicted")["predicted_bug_type"]
+
+    exact_match = load("exact_match")
+    result3 = exact_match.compute(
+        predictions=predicted_bug_type, references=pass_bug_type
+    )
+
+    assert result3 is not None, "The exact match accuracy must not be None"
+
+    result = {**result1, **result2, **result3}
+
+    return result, test_results
 
 
 class Metric:
@@ -173,7 +222,7 @@ class AoCMetric(Metric):
     def __call__(
         self, examples: Dict[str, List], num_sequences: int, timeout: float
     ) -> Tuple:
-        return compute_eval_metric_aoc(examples, num_sequences, timeout)
+        return compute_eval_metric_aoc(examples, num_sequences)
 
 
 def make_metric(dataset_path: str) -> Metric:

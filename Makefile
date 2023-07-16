@@ -15,20 +15,31 @@ fmt: ## Format
 	python -m black ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/  --exclude .venv/
 
 lint: ## Lint
-	python -m flake8 ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/
+	python -m flake8 ./bugnet/
+	python -m flake8 ./aoc-dataset/
+	python -m flake8 ./description/
+	python -m flake8 ./repair/
+	python -m flake8 ./repair-pipeline/
+
+pylint: ## Check with pylint
+	python -m pylint ./bugnet/
+	python -m pylint ./aoc-dataset/
+	python -m pylint ./description/
+	python -m pylint ./repair/
 
 mypy: ## Check with mypy
 	python -m mypy ./bugnet/ --ignore-missing-imports
 	python -m mypy ./aoc-dataset/*.py --ignore-missing-imports
 	python -m mypy ./description/ --ignore-missing-imports
-	python -m mypy ./repair-pipeline/ --ignore-missing-imports
 	python -m mypy ./repair/ --ignore-missing-imports
+	python -m mypy ./repair-pipeline/docker-example/ --ignore-missing-imports
+	python -m mypy ./repair-pipeline/rest-api/ --ignore-missing-imports
 
 pyright: ## Check with pyright
-	python -m pyright ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/
-
-pylint: ## Check with pylint
-	python -m pylint ./bugnet/ ./aoc-dataset/ ./repair-pipeline/ ./description/ ./repair/
+	python -m pyright ./bugnet/
+	python -m pyright ./aoc-dataset/
+	python -m pyright ./description/
+	python -m pyright ./repair/
 
 checks: lint pylint mypy pyright
 
