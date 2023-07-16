@@ -1,5 +1,7 @@
 # Bug Detection and Repair
 
+![yeet](https://github.com/alexjercan/bug-detection/actions/workflows/checks.yml/badge.svg)
+
 Bug Detection and Repair Dataset with Exploratory Data Analysis examples and
 demo applications for Bug Detection and Repair algorithm.
 
