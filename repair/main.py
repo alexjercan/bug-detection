@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -76,7 +77,10 @@ def main(options: Options):
     )
     evaluation_data.save_to_disk(out_path)
 
-    return evaluation_data
+    with open(os.path.join(out_path, "result.json"), "w", encoding="utf-8") as f:
+        json.dump(result, f)
+
+    return evaluation_data, result
 
 
 if __name__ == "__main__":

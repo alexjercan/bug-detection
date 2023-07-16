@@ -1,3 +1,5 @@
+# TODO: this is a hack
+
 from args import DATASET_AOC, DATASET_BUGNET
 from evaluate import load
 from typing import Dict, List, Tuple
@@ -20,7 +22,7 @@ def compute_eval_metric_bugnet(examples: Dict[str, List], num_sequences: int) ->
     )
 
     test_results = {
-        index: (index, {"passed": pass_ == predicted})
+        index: [(index, {"passed": pass_ == predicted})]
         for index, pass_, predicted in zip(
             examples["index"], pass_bug_type, predicted_bug_type
         )
@@ -44,7 +46,7 @@ def compute_eval_metric_aoc(examples: Dict[str, List], num_sequences: int) -> Tu
     )
 
     test_results = {
-        index: (index, {"passed": pass_ == predicted})
+        index: [(index, {"passed": pass_ == predicted})]
         for index, pass_, predicted in zip(
             examples["index"], pass_bug_type, predicted_bug_type
         )

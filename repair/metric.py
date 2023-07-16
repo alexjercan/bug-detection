@@ -7,6 +7,7 @@ import uuid
 from args import DATASET_AOC, DATASET_BUGNET
 from evaluate import load
 from typing import Dict, List, Optional, Tuple
+
 from util import compute_bug_type
 
 os.environ["HF_ALLOW_CODE_EVAL"] = "1"
@@ -98,9 +99,11 @@ def generate_powers_of_two(k: int) -> List[int]:
     return [2**i for i in range(max_exponent + 1)]
 
 
-def generate_assertion_statements(example: Dict[str, List]) -> Dict[str, List]:
+def generate_assertion_statements(
+    example: Dict[str, List], executions: List
+) -> Dict[str, List]:
     results = []
-    for execution, output in zip(example["execution"], example["output"]):
+    for execution, output in zip(executions, example["output"]):
         assertion_results = []
         for execution_output in execution:
             assertion_results.append(
@@ -117,10 +120,9 @@ def compute_eval_metric_bugnet(
 ) -> Tuple:
     # Generate the execution output of the predicted source code
     execution = generate_execution_results(examples, timeout=timeout)["execution"]
-    examples["execution"] = execution
 
     # Generate the assertion statements for the execution output
-    assertion = generate_assertion_statements(examples)["assertion"]
+    assertion = generate_assertion_statements(examples, execution)["assertion"]
 
     # Compute the code eval (pass@k) for the predictions of the model
     code_eval = load("code_eval")
@@ -184,6 +186,7 @@ def compute_eval_metric_aoc(examples: Dict[str, List], num_sequences: int) -> Tu
     )
 
     assert result2 is not None, "The exact match accuracy must not be None"
+    result2 = {"exact_match": result2["exact_match"]}
 
     # Compute the exact match accuracy of the bug type
     pass_bug_type = compute_bug_type(examples, "pass")["pass_bug_type"]
@@ -195,6 +198,7 @@ def compute_eval_metric_aoc(examples: Dict[str, List], num_sequences: int) -> Tu
     )
 
     assert result3 is not None, "The exact match accuracy must not be None"
+    result3 = {"bug_type": result3["exact_match"]}
 
     result = {**result1, **result2, **result3}
 
