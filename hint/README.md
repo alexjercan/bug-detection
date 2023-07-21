@@ -60,4 +60,10 @@ low (for example bleu 0.005 and match 0.2333), and when the bleu score was
 larger, the exact match was also larger (for example bleu 0.023 and match
 0.9333).
 
-For bugnet I got a bleu score of 0.0413 and an exact match of 0.6.
+I have also repeated the experiment for the bugnet dataset and have used 2
+predictions with ChatGPT. The average bleu score was 0.0429 +- 0.0028 and the
+average exact match on the bug type was 0.58 +- 0.0282. In this experiment I
+couldn't notice the same correlation between the two metrics as I did with the
+AoC dataset. One possible theory is that AoC contains only `algorithm` bugs,
+where the bugnet dataset contains all 3 types. With `input` bugs being the most
+common.
