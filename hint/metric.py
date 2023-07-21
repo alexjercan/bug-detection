@@ -8,49 +8,79 @@ from util import compute_bug_type
 
 
 def compute_eval_metric_bugnet(examples: Dict[str, List], num_sequences: int) -> Tuple:
-    # TODO: Implement this
-    _ = num_sequences
+    # compute the bleu score
+    bleu = load("bleu")
+    references = [
+        ["\n".join(e.splitlines()[j1:j2]) + "\n" + r]
+        for r, e, j1, j2 in zip(examples["error"], examples["pass"], examples["j1"], examples["j2"])
+        for _ in range(num_sequences)
+    ]
+    predictions = [e for es in examples["predicted"] for e in es]
+
+    result1 = bleu.compute(predictions=predictions, references=references)
+    assert result1 is not None, "The bleu score must not be None"
 
     # Compute the bug type (input, output, algorithm) using the pass code
     pass_bug_type = compute_bug_type(examples, "pass")["pass_bug_type"]
     predicted_bug_type = compute_bug_type(examples, "predicted")["predicted_bug_type"]
 
+    pass_bug_type_long = [e for e in pass_bug_type for _ in range(num_sequences)]
+    predicted_bug_type_flat = [e for es in predicted_bug_type for e in es]
+
     # Compute the exact match accuracy of the bug type
     exact_match = load("exact_match")
-    result = exact_match.compute(
-        predictions=predicted_bug_type, references=pass_bug_type
+    result2 = exact_match.compute(
+        predictions=predicted_bug_type_flat, references=pass_bug_type_long
     )
+    assert result2 is not None, "The exact match accuracy must not be None"
 
     test_results = {
-        index: [(index, {"passed": pass_ == predicted})]
+        index: [(index, {"passed": pass_ == pred}) for pred in predicted]
         for index, pass_, predicted in zip(
             examples["index"], pass_bug_type, predicted_bug_type
         )
     }
+
+    result = {**result1, **result2}
 
     return result, test_results
 
 
 def compute_eval_metric_aoc(examples: Dict[str, List], num_sequences: int) -> Tuple:
-    # TODO: Implement this
-    _ = num_sequences
+    # compute the bleu score
+    bleu = load("bleu")
+    references = [
+        ["\n".join(e.splitlines()[j1:j2])]
+        for e, j1, j2 in zip(examples["pass"], examples["j1"], examples["j2"])
+        for _ in range(num_sequences)
+    ]
+    predictions = [e for es in examples["predicted"] for e in es]
+
+    result1 = bleu.compute(predictions=predictions, references=references)
+    assert result1 is not None, "The bleu score must not be None"
 
     # Compute the bug type (input, output, algorithm) using the pass code
     pass_bug_type = compute_bug_type(examples, "pass")["pass_bug_type"]
     predicted_bug_type = compute_bug_type(examples, "predicted")["predicted_bug_type"]
 
+    pass_bug_type_long = [e for e in pass_bug_type for _ in range(num_sequences)]
+    predicted_bug_type_flat = [e for es in predicted_bug_type for e in es]
+
     # Compute the exact match accuracy of the bug type
     exact_match = load("exact_match")
-    result = exact_match.compute(
-        predictions=predicted_bug_type, references=pass_bug_type
+    result2 = exact_match.compute(
+        predictions=predicted_bug_type_flat, references=pass_bug_type_long
     )
+    assert result2 is not None, "The exact match accuracy must not be None"
 
     test_results = {
-        index: [(index, {"passed": pass_ == predicted})]
+        index: [(index, {"passed": pass_ == pred}) for pred in predicted]
         for index, pass_, predicted in zip(
             examples["index"], pass_bug_type, predicted_bug_type
         )
     }
+
+    result = {**result1, **result2}
 
     return result, test_results
 

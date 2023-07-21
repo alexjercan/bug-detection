@@ -96,26 +96,32 @@ def compute_bug_type_pass(example: Dict[str, List]) -> Dict[str, List]:
 def compute_bug_type_predicted(example: Dict[str, List]) -> Dict[str, List]:
     results = []
     for predicted, language in zip(example["predicted"], example["language"]):
-        text = predicted[0]
+        result = []
+        for text in predicted:
+            if not text:
+                result.append("empty")
+                continue
 
-        if language == "Python":
-            results.append(
-                "input"
-                if "input" in text
-                else "output"
-                if "output" in text
-                else "algorithm"
-            )
-        elif language == "C++":
-            results.append(
-                "input"
-                if "input" in text
-                else "output"
-                if "output" in text
-                else "algorithm"
-            )
-        else:
-            raise NotImplementedError(f"{language} not implemented yet")
+            if language == "Python":
+                result.append(
+                    "input"
+                    if "input" in text
+                    else "output"
+                    if "output" in text
+                    else "algorithm"
+                )
+            elif language == "C++":
+                result.append(
+                    "input"
+                    if "input" in text
+                    else "output"
+                    if "output" in text
+                    else "algorithm"
+                )
+            else:
+                raise NotImplementedError(f"{language} not implemented yet")
+
+        results.append(result)
 
     return {"predicted_bug_type": results}
 

@@ -1,8 +1,25 @@
+import json
+import os
+
 import openai
 import time
 from typing import Any, Dict, List
 
 from .model import Pipeline
+
+path = os.path.dirname(os.path.abspath(__file__))
+prompt_path = os.path.join(path, "chatgpt.prompt.txt")
+
+with open(prompt_path, "r", encoding="utf-8") as f:
+    SYSTEM = f.read()
+
+
+def try_parse_content(content: str) -> str:
+    try:
+        bugs = json.loads(content)["bugs"]
+        return "\n".join([b["bug"] for b in bugs])
+    except json.decoder.JSONDecodeError:
+        return content
 
 
 def make_chatgpt_prompt_simple(source: str) -> str:
@@ -18,15 +35,16 @@ def chatgpt_inference(example: Dict[str, Any], num_sequences: int) -> List[str]:
         messages=[
             {
                 "role": "system",
-                "content": "Respond with a description in natural language. "
-                "You have to explain the possible error that can arise to the user.",
+                "content": SYSTEM,
             },
             {"role": "user", "content": prompt},
         ],
     )
     assert isinstance(response, dict), "Failed to get a response from OpenAI."
 
-    chatgpt_results = [r["message"]["content"] for r in response["choices"]]
+    chatgpt_results = [
+        try_parse_content(r["message"]["content"]) for r in response["choices"]
+    ]
 
     time.sleep(1)
 
