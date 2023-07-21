@@ -59,3 +59,5 @@ the two metrics. When the bleu score was really low, the exact match was also
 low (for example bleu 0.005 and match 0.2333), and when the bleu score was
 larger, the exact match was also larger (for example bleu 0.023 and match
 0.9333).
+
+For bugnet I got a bleu score of 0.0413 and an exact match of 0.6.
