@@ -12,7 +12,9 @@ def compute_eval_metric_bugnet(examples: Dict[str, List], num_sequences: int) ->
     bleu = load("bleu")
     references = [
         ["\n".join(e.splitlines()[j1:j2]) + "\n" + r]
-        for r, e, j1, j2 in zip(examples["error"], examples["pass"], examples["j1"], examples["j2"])
+        for r, e, j1, j2 in zip(
+            examples["error"], examples["pass"], examples["j1"], examples["j2"]
+        )
         for _ in range(num_sequences)
     ]
     predictions = [e for es in examples["predicted"] for e in es]
