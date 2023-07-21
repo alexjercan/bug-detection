@@ -252,11 +252,8 @@ def execute_source(
                 check=False,
             )
 
-            if result.returncode == 0:
-                if result.stdout != output:
-                    return "WA", ""
-
-                return None
+            if result.returncode == 0 and result.stdout != output:
+                return "WA", ""
 
             return str(result.returncode), str(result.stderr)
         except subprocess.TimeoutExpired:
@@ -278,11 +275,8 @@ def execute_source(
                 check=False,
             )
 
-            if result.returncode == 0:
-                if result.stdout != output:
-                    return "WA", ""
-
-                return None
+            if result.returncode == 0 and result.stdout != output:
+                return "WA", ""
 
             rs = "|".join(
                 [
