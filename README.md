@@ -36,6 +36,6 @@ make install
 
 3. To visualize the `AoC` dataaset see [aoc-dataset](./aoc-dataset/)
 
-4. To visualize the results of the hint generation on the `BugNet` (of `AoC`) dataset see [hint](./hint//) -- upgrade
+4. To visualize the results of the hint generation on the `BugNet` (of `AoC`) dataset see [hint](./hint//)
 
 5. To visualize the result of the repair generation on the `BugNet` (or `AoC`) dataset see [repair](./repair/)
