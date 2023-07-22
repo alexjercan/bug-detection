@@ -227,7 +227,7 @@ def execute_source(
     input_: str,
     output: str,
     timeout: Optional[float] = None,
-) -> Optional[Tuple[str, str]]:
+) -> Optional[Tuple[str, str, str]]:
     path = id2submission(problem_id, language, submission_id)
 
     if language == "C++":
@@ -252,12 +252,14 @@ def execute_source(
                 check=False,
             )
 
-            if result.returncode == 0 and result.stdout != output:
-                return "WA", ""
+            stdout = str(result.stdout)
 
-            return str(result.returncode), str(result.stderr)
+            if result.returncode == 0 and stdout != output:
+                return "WA", "", stdout
+
+            return str(result.returncode), str(result.stderr), stdout
         except subprocess.TimeoutExpired:
-            return "TLE", ""
+            return "TLE", "", ""
 
     if language == "Python":
         try:
@@ -275,8 +277,10 @@ def execute_source(
                 check=False,
             )
 
-            if result.returncode == 0 and result.stdout != output:
-                return "WA", ""
+            stdout = str(result.stdout)
+
+            if result.returncode == 0 and stdout != output:
+                return "WA", "", stdout
 
             rs = "|".join(
                 [
@@ -287,26 +291,15 @@ def execute_source(
             p_class = re.compile(rs, re.MULTILINE)
             error_class = p_class.findall(result.stderr)
             if error_class:
-                return functools.reduce(
-                    lambda acc, x: acc or x, error_class[0], None
-                ), str(result.stderr)
+                return (
+                    functools.reduce(lambda acc, x: acc or x, error_class[0], None),
+                    str(result.stderr),
+                    stdout,
+                )
 
-            rs = "|".join(
-                [
-                    r"^(\w*Error):.*",
-                    r"^(\w*Warning):.*",
-                ]
-            )
-            p_class = re.compile(rs, re.MULTILINE)
-            error_class = p_class.findall(result.stderr)
-            if error_class:
-                return functools.reduce(
-                    lambda acc, x: acc or x, error_class[0], None
-                ), str(result.stderr)
-
-            return str(result.returncode), str(result.stderr)
+            return str(result.returncode), str(result.stderr), stdout
         except subprocess.TimeoutExpired:
-            return "TLE", ""
+            return "TLE", "", ""
 
     raise NotImplementedError(f"{language} not implemented yet")
 
@@ -393,6 +386,7 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
         "j2",
         "error",
         "stderr",
+        "stdout",
     ]
     dfs = []
 
@@ -483,9 +477,9 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                 # is MLE we will trust it :) because my pc crashes
                 error_tup = None
                 if original_status == "Memory Limit Exceeded":
-                    error_tup = "MLE", ""
+                    error_tup = "MLE", "", ""
                 elif original_status == "Time Limit Exceeded":
-                    error_tup = "TLE", ""
+                    error_tup = "TLE", "", ""
                 else:
                     error_tup = execute_source(
                         problem_id,
@@ -498,7 +492,7 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                 if error_tup is None:
                     continue
 
-                error, stderr = error_tup
+                error, stderr, stdout = error_tup
 
                 LOGGER.debug(
                     "Added %s to csv", id2submission(problem_id, language, original_id)
@@ -518,6 +512,7 @@ def codenet_submission_pairs_task(problem_id: str) -> pd.DataFrame:
                         j2,
                         error,
                         stderr,
+                        stdout,
                     )
                 )
 
@@ -576,6 +571,7 @@ def codenet_submission_pairs(
                     dfs.append(problem_pairs_df)
                     problem_pairs_df.to_csv(
                         generated_pairs_path + f".tmp.{problem_id}",
+                        escapechar="\\",
                         index=False,
                     )
                 except Exception as exc:
