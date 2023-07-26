@@ -71,7 +71,7 @@ maybe it can be improve somehow.
 | gpt-3.5-turbo*   | AoC     | 0.3333 | 0.6666 | 0.0         | 0.6      |
 | gpt-3.5-turbo*   | bugnet  | 0.795  | 0.86   | 0.0         | 0.75     |
 | llama2-70B-chat  | AoC     | 0.0    | 0.0    | 0.0         | 1.0      |
-| llama2-70B-chat  | bugnet  |        |        |             |          |
+| llama2-70B-chat  | bugnet  | 0.0    | 0.0    | 0.0         | 0.26     |
 
 - \* I have used the chatgpt version [ChatGPT July 20
   Version](https://help.openai.com/en/articles/6825453-chatgpt-release-notes)
