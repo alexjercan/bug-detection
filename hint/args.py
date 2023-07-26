@@ -7,6 +7,7 @@ DATASET_BUGNET = "alexjercan/bugnet"
 DATASET_AOC = "alexjercan/AoC"
 
 MODEL_CHATGPT = "gpt-3.5-turbo"
+MODEL_LLAMA2_HF = "llama2-hf"
 
 
 @dataclass
@@ -55,7 +56,7 @@ def parse_args() -> Options:
         "--checkpoint",
         type=str,
         default=MODEL_CHATGPT,
-        choices=[MODEL_CHATGPT],
+        choices=[MODEL_CHATGPT, MODEL_LLAMA2_HF],
         help="Checkpoint to use",
     )
     parser.add_argument(
