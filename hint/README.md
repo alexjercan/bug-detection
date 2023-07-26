@@ -9,7 +9,8 @@ Supported datasets
 
 Supported models:
 
-- gpt-3.5-turbo
+- gpt-3.5-turbo (ChatGPT)
+- llama2-hf (llama2-70B-chat)
 
 ## Quickstart
 
