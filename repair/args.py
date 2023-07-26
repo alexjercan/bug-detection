@@ -8,6 +8,7 @@ DATASET_AOC = "alexjercan/AoC"
 
 MODEL_CHATGPT = "gpt-3.5-turbo"
 MODEL_CODEGEN2 = "Salesforce/codegen2-1B"
+MODEL_LLAMA2_HF = "llama2-hf"
 
 
 @dataclass
@@ -57,7 +58,7 @@ def parse_args() -> Options:
         "--checkpoint",
         type=str,
         default=MODEL_CHATGPT,
-        choices=[MODEL_CHATGPT, MODEL_CODEGEN2],
+        choices=[MODEL_CHATGPT, MODEL_CODEGEN2, MODEL_LLAMA2_HF],
         help="Checkpoint to use",
     )
     parser.add_argument(

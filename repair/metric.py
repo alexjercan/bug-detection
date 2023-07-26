@@ -145,6 +145,7 @@ def compute_eval_metric_bugnet(
     )
 
     assert result2 is not None, "The exact match accuracy must not be None"
+    result2 = {"exact_match": result2["exact_match"]}
 
     # Compute the exact match accuracy of the bug type
     pass_bug_type = compute_bug_type(examples, "pass")["pass_bug_type"]
@@ -156,6 +157,7 @@ def compute_eval_metric_bugnet(
     )
 
     assert result3 is not None, "The exact match accuracy must not be None"
+    result3 = {"bug_type": result3["exact_match"]}
 
     result = {**result1, **result2, **result3}
 
