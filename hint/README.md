@@ -67,3 +67,13 @@ couldn't notice the same correlation between the two metrics as I did with the
 AoC dataset. One possible theory is that AoC contains only `algorithm` bugs,
 where the bugnet dataset contains all 3 types. With `input` bugs being the most
 common.
+
+| Model            | Dataset | exact match | bleu     |
+|------------------|---------|-------------|----------|
+| gpt-3.5-turbo*   | AoC     | 0.6777      | 0.0116   |
+| gpt-3.5-turbo*   | bugnet  | 0.58        | 0.0429   |
+| llama2-70B-chat  | AoC     | 1.0         | 0.0      |
+| llama2-70B-chat  | bugnet  | 0.26        | 0.0      |
+
+- \* I have used the chatgpt version [ChatGPT July 20
+  Version](https://help.openai.com/en/articles/6825453-chatgpt-release-notes)
