@@ -32,7 +32,7 @@ def main(options: Options):
     split = options.split
 
     # Create the pipeline
-    pipe = make_pipeline(checkpoint)
+    pipe = make_pipeline(checkpoint, num_sequences=num_sequences)
 
     # Load the dataset
     dataset = make_dataset(dataset_path, subset, split)
@@ -52,7 +52,7 @@ def main(options: Options):
             prediction = pipe(example)
         except Exception as e:
             logging.error("Error: %s", e)
-            prediction = [""]
+            prediction = ["" for _ in range(num_sequences)]
 
         predictions.append(prediction)
 
