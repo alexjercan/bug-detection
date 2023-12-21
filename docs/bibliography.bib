@@ -1,0 +1,476 @@
+@misc{mou2015convolutional,
+      title={Convolutional Neural Networks over Tree Structures for Programming Language Processing}, 
+      author={Lili Mou and Ge Li and Lu Zhang and Tao Wang and Zhi Jin},
+      year={2015},
+      eprint={1409.5718},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@misc{puri2021codenet,
+      title={CodeNet: A Large-Scale AI for Code Dataset for Learning a Diversity of Coding Tasks}, 
+      author={Ruchir Puri and David S. Kung and Geert Janssen and Wei Zhang and Giacomo Domeniconi and Vladimir Zolotov and Julian Dolby and Jie Chen and Mihir Choudhury and Lindsey Decker and Veronika Thost and Luca Buratti and Saurabh Pujar and Shyam Ramji and Ulrich Finkler and Susan Malaika and Frederick Reiss},
+      year={2021},
+      eprint={2105.12655},
+      archivePrefix={arXiv},
+      primaryClass={cs.SE}
+}
+
+@inproceedings{10.1145/3359591.3359735,
+author = {Allamanis, Miltiadis},
+title = {The Adverse Effects of Code Duplication in Machine Learning Models of Code},
+year = {2019},
+isbn = {9781450369954},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3359591.3359735},
+doi = {10.1145/3359591.3359735},
+abstract = {The field of big code relies on mining large corpora of code to perform some learning task towards creating better tools for software engineers. A significant threat to this approach was recently identified by Lopes et al. (2017) who found a large amount of near-duplicate code on GitHub. However, the impact of code duplication has not been noticed by researchers devising machine learning models for source code. In this work, we explore the effects of code duplication on machine learning models showing that reported performance metrics are sometimes inflated by up to 100% when testing on duplicated code corpora compared to the performance on de-duplicated corpora which more accurately represent how machine learning models of code are used by software engineers. We present a duplication index for widely used datasets, list best practices for collecting code corpora and evaluating machine learning models on them. Finally, we release tools to help the community avoid this problem in future research.},
+booktitle = {Proceedings of the 2019 ACM SIGPLAN International Symposium on New Ideas, New Paradigms, and Reflections on Programming and Software},
+pages = {143–153},
+numpages = {11},
+keywords = {machine learning, dataset collection, duplication, big code, code naturalness},
+location = {Athens, Greece},
+series = {Onward! 2019}
+}
+
+@misc{mikolov2013efficient,
+      title={Efficient Estimation of Word Representations in Vector Space}, 
+      author={Tomas Mikolov and Kai Chen and Greg Corrado and Jeffrey Dean},
+      year={2013},
+      eprint={1301.3781},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@misc{bojanowski2017enriching,
+      title={Enriching Word Vectors with Subword Information}, 
+      author={Piotr Bojanowski and Edouard Grave and Armand Joulin and Tomas Mikolov},
+      year={2017},
+      eprint={1607.04606},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@ARTICLE{6651713,  author={Wong, W. Eric and Debroy, Vidroha and Gao, Ruizhi and Li, Yihao},  journal={IEEE Transactions on Reliability},   title={The DStar Method for Effective Software Fault Localization},   year={2014},  volume={63},  number={1},  pages={290-308},  doi={10.1109/TR.2013.2285319}}
+
+@inproceedings{10.1145/3387940.3391464,
+author = {Briem, J\'{o}n Arnar and Smit, Jordi and Sellik, Hendrig and Rapoport, Pavel and Gousios, Georgios and Aniche, Maur\'{\i}cio},
+title = {OffSide: Learning to Identify Mistakes in Boundary Conditions},
+year = {2020},
+isbn = {9781450379632},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3387940.3391464},
+doi = {10.1145/3387940.3391464},
+abstract = {Mistakes in boundary conditions are the cause of many bugs in software. These mistakes happen when, e.g., developers make use of '&lt;' or '&gt;' in cases where they should have used '&lt;=' or '&gt;='. Mistakes in boundary conditions are often hard to find and manually detecting them might be very time-consuming for developers. While researchers have been proposing techniques to cope with mistakes in the boundaries for a long time, the automated detection of such bugs still remains a challenge. We conjecture that, for a tool to be able to precisely identify mistakes in boundary conditions, it should be able to capture the overall context of the source code under analysis. In this work, we propose a deep learning model that learn mistakes in boundary conditions and, later, is able to identify them in unseen code snippets. We train and test a model on over 1.5 million code snippets, with and without mistakes in different boundary conditions. Our model shows an accuracy from 55% up to 87%. The model is also able to detect 24 out of 41 real-world bugs; however, with a high false positive rate. The existing state-of-the-practice linter tools are not able to detect any of the bugs. We hope this paper can pave the road towards deep learning models that will be able to support developers in detecting mistakes in boundary conditions.},
+booktitle = {Proceedings of the IEEE/ACM 42nd International Conference on Software Engineering Workshops},
+pages = {203–208},
+numpages = {6},
+keywords = {machine learning for software testing, software engineering, deep learning for software testing, machine learning for software engineering, software testing, boundary testing},
+location = {Seoul, Republic of Korea},
+series = {ICSEW'20}
+}
+
+@misc{alon2019code2seq,
+      title={code2seq: Generating Sequences from Structured Representations of Code}, 
+      author={Uri Alon and Shaked Brody and Omer Levy and Eran Yahav},
+      year={2019},
+      eprint={1808.01400},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@article{10.1145/3290353,
+author = {Alon, Uri and Zilberstein, Meital and Levy, Omer and Yahav, Eran},
+title = {Code2vec: Learning Distributed Representations of Code},
+year = {2019},
+issue_date = {January 2019},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {3},
+number = {POPL},
+url = {https://doi.org/10.1145/3290353},
+doi = {10.1145/3290353},
+abstract = {We present a neural model for representing snippets of code as continuous distributed vectors (``code embeddings''). The main idea is to represent a code snippet as a single fixed-length code vector, which can be used to predict semantic properties of the snippet. To this end, code is first decomposed to a collection of paths in its abstract syntax tree. Then, the network learns the atomic representation of each path while simultaneously learning how to aggregate a set of them.  We demonstrate the effectiveness of our approach by using it to predict a method's name from the vector representation of its body. We evaluate our approach by training a model on a dataset of 12M methods. We show that code vectors trained on this dataset can predict method names from files that were unobserved during training. Furthermore, we show that our model learns useful method name vectors that capture semantic similarities, combinations, and analogies.  A comparison of our approach to previous techniques over the same dataset shows an improvement of more than 75%, making it the first to successfully predict method names based on a large, cross-project corpus. Our trained model, visualizations and vector similarities are available as an interactive online demo at http://code2vec.org. The code, data and trained models are available at https://github.com/tech-srl/code2vec.},
+journal = {Proc. ACM Program. Lang.},
+month = {jan},
+articleno = {40},
+numpages = {29},
+keywords = {Machine Learning, Big Code, Distributed Representations}
+}
+
+@article{10.1145/3276517,
+author = {Pradel, Michael and Sen, Koushik},
+title = {DeepBugs: A Learning Approach to Name-Based Bug Detection},
+year = {2018},
+issue_date = {November 2018},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {2},
+number = {OOPSLA},
+url = {https://doi.org/10.1145/3276517},
+doi = {10.1145/3276517},
+abstract = {Natural language elements in source code, e.g., the names of variables and functions, convey useful information. However, most existing bug detection tools ignore this information and therefore miss some classes of bugs. The few existing name-based bug detection approaches reason about names on a syntactic level and rely on manually designed and tuned algorithms to detect bugs. This paper presents DeepBugs, a learning approach to name-based bug detection, which reasons about names based on a semantic representation and which automatically learns bug detectors instead of manually writing them. We formulate bug detection as a binary classification problem and train a classifier that distinguishes correct from incorrect code. To address the challenge that effectively learning a bug detector requires examples of both correct and incorrect code, we create likely incorrect code examples from an existing corpus of code through simple code transformations. A novel insight learned from our work is that learning from artificially seeded bugs yields bug detectors that are effective at finding bugs in real-world code. We implement our idea into a framework for learning-based and name-based bug detection. Three bug detectors built on top of the framework detect accidentally swapped function arguments, incorrect binary operators, and incorrect operands in binary operations. Applying the approach to a corpus of 150,000 JavaScript files yields bug detectors that have a high accuracy (between 89% and 95%), are very efficient (less than 20 milliseconds per analyzed file), and reveal 102 programming mistakes (with 68% true positive rate) in real-world code.},
+journal = {Proc. ACM Program. Lang.},
+month = {oct},
+articleno = {147},
+numpages = {25},
+keywords = {Machine learning, Natural language, Bug detection, JavaScript, Name-based program analysis}
+}
+
+@article{10.1145/3360588,
+author = {Li, Yi and Wang, Shaohua and Nguyen, Tien N. and Van Nguyen, Son},
+title = {Improving Bug Detection via Context-Based Code Representation Learning and Attention-Based Neural Networks},
+year = {2019},
+issue_date = {October 2019},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {3},
+number = {OOPSLA},
+url = {https://doi.org/10.1145/3360588},
+doi = {10.1145/3360588},
+abstract = {Bug detection has been shown to be an effective way to help developers in detecting bugs early, thus, saving much effort and time in software development process. Recently, deep learning-based bug detection approaches have gained successes over the traditional machine learning-based approaches, the rule-based program analysis approaches, and mining-based approaches. However, they are still limited in detecting bugs that involve multiple methods and suffer high rate of false positives. In this paper, we propose a combination approach with the use of contexts and attention neural network to overcome those limitations. We propose to use as the global context the Program Dependence Graph (PDG) and Data Flow Graph (DFG) to connect the method under investigation with the other relevant methods that might contribute to the buggy code. The global context is complemented by the local context extracted from the path on the AST built from the method’s body. The use of PDG and DFG enables our model to reduce the false positive rate, while to complement for the potential reduction in recall, we make use of the attention neural network mechanism to put more weights on the buggy paths in the source code. That is, the paths that are similar to the buggy paths will be ranked higher, thus, improving the recall of our model. We have conducted several experiments to evaluate our approach on a very large dataset with +4.973M methods in 92 different project versions. The results show that our tool can have a relative improvement up to 160% on F-score when comparing with the state-of-the-art bug detection approaches. Our tool can detect 48 true bugs in the list of top 100 reported bugs, which is 24 more true bugs when comparing with the baseline approaches. We also reported that our representation is better suitable for bug detection and relatively improves over the other representations up to 206% in accuracy.},
+journal = {Proc. ACM Program. Lang.},
+month = {oct},
+articleno = {162},
+numpages = {30},
+keywords = {Bug Detection, Program Graphs, Deep Learning, Attention Neural Networks, Code Representation Learning, Network Embedding}
+}
+
+@misc{grover2016node2vec,
+      title={node2vec: Scalable Feature Learning for Networks}, 
+      author={Aditya Grover and Jure Leskovec},
+      year={2016},
+      eprint={1607.00653},
+      archivePrefix={arXiv},
+      primaryClass={cs.SI}
+}
+
+@article{10.1145/3340544,
+author = {Tufano, Michele and Watson, Cody and Bavota, Gabriele and Penta, Massimiliano Di and White, Martin and Poshyvanyk, Denys},
+title = {An Empirical Study on Learning Bug-Fixing Patches in the Wild via Neural Machine Translation},
+year = {2019},
+issue_date = {October 2019},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {28},
+number = {4},
+issn = {1049-331X},
+url = {https://doi.org/10.1145/3340544},
+doi = {10.1145/3340544},
+abstract = {Millions of open source projects with numerous bug fixes are available in code repositories. This proliferation of software development histories can be leveraged to learn how to fix common programming bugs. To explore such a potential, we perform an empirical study to assess the feasibility of using Neural Machine Translation techniques for learning bug-fixing patches for real defects. First, we mine millions of bug-fixes from the change histories of projects hosted on GitHub in order to extract meaningful examples of such bug-fixes. Next, we abstract the buggy and corresponding fixed code, and use them to train an Encoder-Decoder model able to translate buggy code into its fixed version. In our empirical investigation, we found that such a model is able to fix thousands of unique buggy methods in the wild. Overall, this model is capable of predicting fixed patches generated by developers in 9--50% of the cases, depending on the number of candidate patches we allow it to generate. Also, the model is able to emulate a variety of different Abstract Syntax Tree operations and generate candidate patches in a split second.},
+journal = {ACM Trans. Softw. Eng. Methodol.},
+month = {sep},
+articleno = {19},
+numpages = {29},
+keywords = {Neural machine translation, bug-fixes}
+}
+
+@misc{sharma2021survey,
+      title={A Survey on Machine Learning Techniques for Source Code Analysis}, 
+      author={Tushar Sharma and Maria Kechagia and Stefanos Georgiou and Rohit Tiwari and Federica Sarro},
+      year={2021},
+      eprint={2110.09610},
+      archivePrefix={arXiv},
+      primaryClass={cs.SE}
+}
+
+@misc{allamanis2018survey,
+      title={A Survey of Machine Learning for Big Code and Naturalness}, 
+      author={Miltiadis Allamanis and Earl T. Barr and Premkumar Devanbu and Charles Sutton},
+      year={2018},
+      eprint={1709.06182},
+      archivePrefix={arXiv},
+      primaryClass={cs.SE}
+}
+
+@misc{pearce2021asleep,
+      title={Asleep at the Keyboard? Assessing the Security of GitHub Copilot's Code Contributions}, 
+      author={Hammond Pearce and Baleegh Ahmad and Benjamin Tan and Brendan Dolan-Gavitt and Ramesh Karri},
+      year={2021},
+      eprint={2108.09293},
+      archivePrefix={arXiv},
+      primaryClass={cs.CR}
+}
+
+@inproceedings{DBLP:conf/kbse/FalleriMBMM14,
+  author    = {Jean{-}R{\'{e}}my Falleri and
+               Flor{\'{e}}al Morandat and
+               Xavier Blanc and
+               Matias Martinez and
+               Martin Monperrus},
+  title     = {Fine-grained and accurate source code differencing},
+  booktitle = {{ACM/IEEE} International Conference on Automated Software Engineering,
+               {ASE} '14, Vasteras, Sweden - September 15 - 19, 2014},
+  pages     = {313--324},
+  year      = {2014},
+  url       = {http://doi.acm.org/10.1145/2642937.2642982},
+  doi       = {10.1145/2642937.2642982}
+}
+
+@misc{https://doi.org/10.48550/arxiv.2002.08155,
+  doi = {10.48550/ARXIV.2002.08155},
+  
+  url = {https://arxiv.org/abs/2002.08155},
+  
+  author = {Feng, Zhangyin and Guo, Daya and Tang, Duyu and Duan, Nan and Feng, Xiaocheng and Gong, Ming and Shou, Linjun and Qin, Bing and Liu, Ting and Jiang, Daxin and Zhou, Ming},
+  
+  keywords = {Computation and Language (cs.CL), Programming Languages (cs.PL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {CodeBERT: A Pre-Trained Model for Programming and Natural Languages},
+  
+  publisher = {arXiv},
+  
+  year = {2020},
+  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+@misc{https://doi.org/10.48550/arxiv.1609.08144,
+  doi = {10.48550/ARXIV.1609.08144},
+  
+  url = {https://arxiv.org/abs/1609.08144},
+  
+  author = {Wu, Yonghui and Schuster, Mike and Chen, Zhifeng and Le, Quoc V. and Norouzi, Mohammad and Macherey, Wolfgang and Krikun, Maxim and Cao, Yuan and Gao, Qin and Macherey, Klaus and Klingner, Jeff and Shah, Apurva and Johnson, Melvin and Liu, Xiaobing and Kaiser, Łukasz and Gouws, Stephan and Kato, Yoshikiyo and Kudo, Taku and Kazawa, Hideto and Stevens, Keith and Kurian, George and Patil, Nishant and Wang, Wei and Young, Cliff and Smith, Jason and Riesa, Jason and Rudnick, Alex and Vinyals, Oriol and Corrado, Greg and Hughes, Macduff and Dean, Jeffrey},
+  
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {Google's Neural Machine Translation System: Bridging the Gap between Human and Machine Translation},
+  
+  publisher = {arXiv},
+  
+  year = {2016},
+  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+@misc{https://doi.org/10.48550/arxiv.1909.09436,
+  doi = {10.48550/ARXIV.1909.09436},
+  
+  url = {https://arxiv.org/abs/1909.09436},
+  
+  author = {Husain, Hamel and Wu, Ho-Hsiang and Gazit, Tiferet and Allamanis, Miltiadis and Brockschmidt, Marc},
+  
+  keywords = {Machine Learning (cs.LG), Information Retrieval (cs.IR), Software Engineering (cs.SE), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {CodeSearchNet Challenge: Evaluating the State of Semantic Code Search},
+  
+  publisher = {arXiv},
+  
+  year = {2019},
+  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+@misc{https://doi.org/10.48550/arxiv.2103.06333,
+  doi = {10.48550/ARXIV.2103.06333},
+  
+  url = {https://arxiv.org/abs/2103.06333},
+  
+  author = {Ahmad, Wasi Uddin and Chakraborty, Saikat and Ray, Baishakhi and Chang, Kai-Wei},
+  
+  keywords = {Computation and Language (cs.CL), Programming Languages (cs.PL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {Unified Pre-training for Program Understanding and Generation},
+  
+  publisher = {arXiv},
+  
+  year = {2021},
+  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+@misc{https://doi.org/10.48550/arxiv.2109.00859,
+  doi = {10.48550/ARXIV.2109.00859},
+  
+  url = {https://arxiv.org/abs/2109.00859},
+  
+  author = {Wang, Yue and Wang, Weishi and Joty, Shafiq and Hoi, Steven C. H.},
+  
+  keywords = {Computation and Language (cs.CL), Programming Languages (cs.PL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {CodeT5: Identifier-aware Unified Pre-trained Encoder-Decoder Models for Code Understanding and Generation},
+  
+  publisher = {arXiv},
+  
+  year = {2021},
+  
+  copyright = {Creative Commons Attribution Non Commercial Share Alike 4.0 International}
+}
+
+@misc{https://doi.org/10.48550/arxiv.2203.02155,
+  doi = {10.48550/ARXIV.2203.02155},
+  
+  url = {https://arxiv.org/abs/2203.02155},
+  
+  author = {Ouyang, Long and Wu, Jeff and Jiang, Xu and Almeida, Diogo and Wainwright, Carroll L. and Mishkin, Pamela and Zhang, Chong and Agarwal, Sandhini and Slama, Katarina and Ray, Alex and Schulman, John and Hilton, Jacob and Kelton, Fraser and Miller, Luke and Simens, Maddie and Askell, Amanda and Welinder, Peter and Christiano, Paul and Leike, Jan and Lowe, Ryan},
+  
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {Training language models to follow instructions with human feedback},
+  
+  publisher = {arXiv},
+  
+  year = {2022},
+  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+@misc{https://doi.org/10.48550/arxiv.2301.08653,
+  doi = {10.48550/ARXIV.2301.08653},
+  
+  url = {https://arxiv.org/abs/2301.08653},
+  
+  author = {Sobania, Dominik and Briesch, Martin and Hanna, Carol and Petke, Justyna},
+  
+  keywords = {Software Engineering (cs.SE), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {An Analysis of the Automatic Bug Fixing Performance of ChatGPT},
+  
+  publisher = {arXiv},
+  
+  year = {2023},
+  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+@inproceedings{10.1145/3135932.3135941,
+author = {Lin, Derrick and Koppel, James and Chen, Angela and Solar-Lezama, Armando},
+title = {QuixBugs: A Multi-Lingual Program Repair Benchmark Set Based on the Quixey Challenge},
+year = {2017},
+isbn = {9781450355148},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3135932.3135941},
+doi = {10.1145/3135932.3135941},
+abstract = {Recent years have seen an explosion of work in automated program repair. While previous work has focused exclusively on tools for single languages, recent work in multi-language transformation has opened the door for multi-language program repair tools. Evaluating the performance of such a tool requires having a benchmark set of similar buggy programs in different languages. We present QuixBugs, consisting of 40 programs translated to both Python and Java, each with a bug on a single line. The QuixBugs benchmark suite is based on problems from the Quixey Challenge, where programmers were given a short buggy program and 1 minute to fix the bug.},
+booktitle = {Proceedings Companion of the 2017 ACM SIGPLAN International Conference on Systems, Programming, Languages, and Applications: Software for Humanity},
+pages = {55–56},
+numpages = {2},
+keywords = {automated program repair, benchmark},
+location = {Vancouver, BC, Canada},
+series = {SPLASH Companion 2017}
+}
+
+@misc{chen2021evaluating,
+      title={Evaluating Large Language Models Trained on Code}, 
+      author={Mark Chen and Jerry Tworek and Heewoo Jun and Qiming Yuan and Henrique Ponde de Oliveira Pinto and Jared Kaplan and Harri Edwards and Yuri Burda and Nicholas Joseph and Greg Brockman and Alex Ray and Raul Puri and Gretchen Krueger and Michael Petrov and Heidy Khlaaf and Girish Sastry and Pamela Mishkin and Brooke Chan and Scott Gray and Nick Ryder and Mikhail Pavlov and Alethea Power and Lukasz Kaiser and Mohammad Bavarian and Clemens Winter and Philippe Tillet and Felipe Petroski Such and Dave Cummings and Matthias Plappert and Fotios Chantzis and Elizabeth Barnes and Ariel Herbert-Voss and William Hebgen Guss and Alex Nichol and Alex Paino and Nikolas Tezak and Jie Tang and Igor Babuschkin and Suchir Balaji and Shantanu Jain and William Saunders and Christopher Hesse and Andrew N. Carr and Jan Leike and Josh Achiam and Vedant Misra and Evan Morikawa and Alec Radford and Matthew Knight and Miles Brundage and Mira Murati and Katie Mayer and Peter Welinder and Bob McGrew and Dario Amodei and Sam McCandlish and Ilya Sutskever and Wojciech Zaremba},
+      year={2021},
+      eprint={2107.03374},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@misc{touvron2023llama,
+      title={LLaMA: Open and Efficient Foundation Language Models}, 
+      author={Hugo Touvron and Thibaut Lavril and Gautier Izacard and Xavier Martinet and Marie-Anne Lachaux and Timothée Lacroix and Baptiste Rozière and Naman Goyal and Eric Hambro and Faisal Azhar and Aurelien Rodriguez and Armand Joulin and Edouard Grave and Guillaume Lample},
+      year={2023},
+      eprint={2302.13971},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@misc{austin2021program,
+      title={Program Synthesis with Large Language Models}, 
+      author={Jacob Austin and Augustus Odena and Maxwell Nye and Maarten Bosma and Henryk Michalewski and David Dohan and Ellen Jiang and Carrie Cai and Michael Terry and Quoc Le and Charles Sutton},
+      year={2021},
+      eprint={2108.07732},
+      archivePrefix={arXiv},
+      primaryClass={cs.PL}
+}
+
+@misc{zheng2023codegeex,
+      title={CodeGeeX: A Pre-Trained Model for Code Generation with Multilingual Evaluations on HumanEval-X}, 
+      author={Qinkai Zheng and Xiao Xia and Xu Zou and Yuxiao Dong and Shan Wang and Yufei Xue and Zihan Wang and Lei Shen and Andi Wang and Yang Li and Teng Su and Zhilin Yang and Jie Tang},
+      year={2023},
+      eprint={2303.17568},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@misc{gao2020pile,
+      title={The Pile: An 800GB Dataset of Diverse Text for Language Modeling}, 
+      author={Leo Gao and Stella Biderman and Sid Black and Laurence Golding and Travis Hoppe and Charles Foster and Jason Phang and Horace He and Anish Thite and Noa Nabeshima and Shawn Presser and Connor Leahy},
+      year={2020},
+      eprint={2101.00027},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@misc{li2023starcoder,
+      title={StarCoder: may the source be with you!}, 
+      author={Raymond Li and Loubna Ben Allal and Yangtian Zi and Niklas Muennighoff and Denis Kocetkov and Chenghao Mou and Marc Marone and Christopher Akiki and Jia Li and Jenny Chim and Qian Liu and Evgenii Zheltonozhskii and Terry Yue Zhuo and Thomas Wang and Olivier Dehaene and Mishig Davaadorj and Joel Lamy-Poirier and João Monteiro and Oleh Shliazhko and Nicolas Gontier and Nicholas Meade and Armel Zebaze and Ming-Ho Yee and Logesh Kumar Umapathi and Jian Zhu and Benjamin Lipkin and Muhtasham Oblokulov and Zhiruo Wang and Rudra Murthy and Jason Stillerman and Siva Sankalp Patel and Dmitry Abulkhanov and Marco Zocca and Manan Dey and Zhihan Zhang and Nour Fahmy and Urvashi Bhattacharyya and Wenhao Yu and Swayam Singh and Sasha Luccioni and Paulo Villegas and Maxim Kunakov and Fedor Zhdanov and Manuel Romero and Tony Lee and Nadav Timor and Jennifer Ding and Claire Schlesinger and Hailey Schoelkopf and Jan Ebert and Tri Dao and Mayank Mishra and Alex Gu and Jennifer Robinson and Carolyn Jane Anderson and Brendan Dolan-Gavitt and Danish Contractor and Siva Reddy and Daniel Fried and Dzmitry Bahdanau and Yacine Jernite and Carlos Muñoz Ferrandis and Sean Hughes and Thomas Wolf and Arjun Guha and Leandro von Werra and Harm de Vries},
+      year={2023},
+      eprint={2305.06161},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@article{Kocetkov2022TheStack,
+  title={The Stack: 3 TB of permissively licensed source code},
+  author={Kocetkov, Denis and Li, Raymond and Ben Allal, Loubna and Li, Jia and Mou,Chenghao and Muñoz Ferrandis, Carlos and Jernite, Yacine and Mitchell, Margaret and Hughes, Sean and Wolf, Thomas and Bahdanau, Dzmitry and von Werra, Leandro and de Vries, Harm},
+  journal={Preprint},
+  year={2022}
+}
+
+@software{openlm2023openllama,
+  author = {Geng, Xinyang and Liu, Hao},
+  title = {OpenLLaMA: An Open Reproduction of LLaMA},
+  month = May,
+  year = 2023,
+  url = {https://github.com/openlm-research/open_llama}
+}
+
+@software{together2023redpajama,
+  author = {Together Computer},
+  title = {RedPajama-Data: An Open Source Recipe to Reproduce LLaMA training dataset},
+  month = April,
+  year = 2023,
+  url = {https://github.com/togethercomputer/RedPajama-Data}
+}
+
+@misc{nijkamp2023codegen2,
+      title={CodeGen2: Lessons for Training LLMs on Programming and Natural Languages}, 
+      author={Erik Nijkamp and Hiroaki Hayashi and Caiming Xiong and Silvio Savarese and Yingbo Zhou},
+      year={2023},
+      eprint={2305.02309},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@misc{ouyang2022training,
+      title={Training language models to follow instructions with human feedback}, 
+      author={Long Ouyang and Jeff Wu and Xu Jiang and Diogo Almeida and Carroll L. Wainwright and Pamela Mishkin and Chong Zhang and Sandhini Agarwal and Katarina Slama and Alex Ray and John Schulman and Jacob Hilton and Fraser Kelton and Luke Miller and Maddie Simens and Amanda Askell and Peter Welinder and Paul Christiano and Jan Leike and Ryan Lowe},
+      year={2022},
+      eprint={2203.02155},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@misc{wei2023chainofthought,
+      title={Chain-of-Thought Prompting Elicits Reasoning in Large Language Models}, 
+      author={Jason Wei and Xuezhi Wang and Dale Schuurmans and Maarten Bosma and Brian Ichter and Fei Xia and Ed Chi and Quoc Le and Denny Zhou},
+      year={2023},
+      eprint={2201.11903},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@misc{wang2023selfconsistency,
+      title={Self-Consistency Improves Chain of Thought Reasoning in Language Models}, 
+      author={Xuezhi Wang and Jason Wei and Dale Schuurmans and Quoc Le and Ed Chi and Sharan Narang and Aakanksha Chowdhery and Denny Zhou},
+      year={2023},
+      eprint={2203.11171},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+
+@misc{yao2023tree,
+      title={Tree of Thoughts: Deliberate Problem Solving with Large Language Models}, 
+      author={Shunyu Yao and Dian Yu and Jeffrey Zhao and Izhak Shafran and Thomas L. Griffiths and Yuan Cao and Karthik Narasimhan},
+      year={2023},
+      eprint={2305.10601},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
